@@ -573,6 +573,12 @@ function renderHome() {
 /* ============================= WORKOUT ============================= */
 function renderWorkout() {
   const week = state.currentWeek;
+
+  // A day is open: show it as its own page
+  if (!editMode && state.openDay && PROGRAM_DAYS.includes(state.openDay)) {
+    return renderDayPage(week, state.openDay);
+  }
+
   let weekChips = "";
   for (let w = 1; w <= 12; w++) {
     weekChips += `<div class="week-chip ${w === week ? "active" : ""}" data-action="set-week" data-week="${w}">${w}</div>`;
@@ -653,18 +659,18 @@ function renderWorkout() {
 
     dayCards += `
       <div class="card day-card">
-        <div class="day-header" data-action="${editMode ? "" : "toggle-day"}" data-day="${day}">
+        <div class="day-header" data-action="${editMode ? "" : "open-day"}" data-day="${day}">
           <div class="row">
             <div class="day-icon ${done ? "done" : ""}">${editMode ? "✏️" : (done ? "✅" : "💪")}</div>
             <div>
-              <div style="font-size:11px;color:var(--ink-muted);font-weight:700;letter-spacing:.3px;">${day.toUpperCase()}</div>
-              <div style="font-size:16px;font-weight:800;">${template.title}</div>
-              <div style="font-size:12px;color:var(--ink-muted);">${editMode ? "Editing this day" : doneCount + "/" + template.exercises.length + " exercises logged"}</div>
+              <div style="font-size:12px;color:var(--ink-muted);font-weight:700;letter-spacing:.3px;">${day.toUpperCase()}</div>
+              <div style="font-size:17px;font-weight:800;">${template.title}</div>
+              <div style="font-size:13px;color:var(--ink-muted);">${editMode ? "Editing this day" : doneCount + "/" + template.exercises.length + " exercises logged"}</div>
             </div>
           </div>
-          ${editMode ? "" : `<div style="font-size:18px;color:var(--ink-muted);">${isOpen ? "▲" : "▼"}</div>`}
+          ${editMode ? "" : `<div style="font-size:26px;color:var(--pink);font-weight:700;">›</div>`}
         </div>
-        ${isOpen ? bodyHtml : ""}
+        ${editMode ? bodyHtml : ""}
       </div>`;
   });
 
@@ -679,6 +685,65 @@ function renderWorkout() {
     ${editMode ? `<div class="empty-hint" style="margin:-6px 0 14px 0;">Editing applies across all 12 weeks. Renaming or deleting an exercise starts fresh tracking for it.</div>` : ""}
     <div class="week-strip">${weekChips}</div>
     ${dayCards}
+  `;
+}
+
+/* One workout day as its own page */
+function renderDayPage(week, day) {
+  const template = state.program[day];
+  const log = getDayLog(week, day);
+  const done = isDayFullyLogged(week, day);
+  const doneCount = completedExerciseCount(week, day);
+
+  let exercisesHtml = "";
+  template.exercises.forEach(ex => {
+    const k = exerciseKey(ex.name);
+    const loggedEx = log.exercises[k];
+    let setsHtml = "";
+    loggedEx.sets.forEach((s, si) => {
+      setsHtml += `
+        <div class="set-row">
+          <span class="setnum">${si + 1}</span>
+          <input type="number" inputmode="decimal" placeholder="kg" value="${s.weight ?? ""}"
+            data-action="set-weight" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}" style="flex:1;" ${ex.track ? "" : "disabled"}/>
+          <input type="number" inputmode="numeric" placeholder="${escapeHtml(ex.reps)}" value="${s.reps ?? ""}"
+            data-action="set-reps" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}" style="flex:1;"/>
+          <button class="check-btn ${s.completed ? "done" : ""}" data-action="toggle-set" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}">✓</button>
+        </div>`;
+    });
+    exercisesHtml += `
+      <div class="exercise-row">
+        <div class="exercise-title">${escapeHtml(ex.name)}</div>
+        <div class="exercise-target">Target: ${ex.sets} x ${escapeHtml(ex.reps)}</div>
+        ${setsHtml}
+      </div>`;
+  });
+
+  const warmupHtml = template.warmup.length
+    ? `<div class="card"><h3 class="section-title" style="margin-bottom:8px;">Warm up</h3>${template.warmup.map(w => `<span class="tag">${escapeHtml(w)}</span>`).join("")}</div>`
+    : "";
+
+  return `
+    <button class="btn ghost small" data-action="back-to-days" style="padding-left:0;margin-bottom:8px;font-size:16px;">‹ All workouts</button>
+    <div class="row between" style="align-items:flex-start;">
+      <div>
+        <p class="page-sub" style="margin-bottom:2px;">Week ${week} · ${day}</p>
+        <h1 class="page-title" style="margin-top:0;">${escapeHtml(template.title)} ${done ? "✅" : ""}</h1>
+      </div>
+    </div>
+    <div class="card" style="padding:12px 18px;">
+      <div class="row between" style="margin-bottom:8px;">
+        <span style="font-weight:700;">Progress</span>
+        <span style="font-size:14px;color:var(--ink-soft);">${doneCount} of ${template.exercises.length} exercises</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" style="width:${Math.round((template.exercises.length ? doneCount/template.exercises.length : 0)*100)}%;"></div></div>
+    </div>
+    ${warmupHtml}
+    <div class="card">
+      ${exercisesHtml}
+      <button class="btn secondary" style="margin-top:16px;" data-action="finish-day" data-week="${week}" data-day="${day}">Mark Day Complete</button>
+    </div>
+    <button class="btn outline" data-action="back-to-days" style="margin-bottom:8px;">‹ Back to all workouts</button>
   `;
 }
 
@@ -926,11 +991,19 @@ function attachHandlers() {
     if (action === "set-week") {
       el.onclick = () => { state.currentWeek = Number(el.dataset.week); save(); render(); };
     }
-    if (action === "toggle-day") {
+    if (action === "open-day") {
       el.onclick = () => {
-        const day = el.dataset.day;
-        state.openDay = state.openDay === day ? null : day;
+        state.openDay = el.dataset.day;
         save(); render();
+        document.getElementById("content").scrollTop = 0;
+        window.scrollTo(0, 0);
+      };
+    }
+    if (action === "back-to-days") {
+      el.onclick = () => {
+        state.openDay = null;
+        save(); render();
+        window.scrollTo(0, 0);
       };
     }
     if (action === "toggle-set") {
@@ -1067,7 +1140,14 @@ function attachHandlers() {
 
 /* ============================= BOOT ============================= */
 document.querySelectorAll("#tabbar .tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => setTab(btn.dataset.tab));
+  btn.addEventListener("click", () => {
+    // Tapping Workout again while inside a day goes back to the day list
+    if (btn.dataset.tab === "workout" && activeTab === "workout" && state.openDay) {
+      state.openDay = null;
+      save();
+    }
+    setTab(btn.dataset.tab);
+  });
 });
 setTab("home");
 
