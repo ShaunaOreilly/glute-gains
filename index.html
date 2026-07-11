@@ -161,6 +161,64 @@
   .toast.show { opacity: 0.95; }
   .install-steps { font-size: 13px; color: var(--ink-soft); line-height: 1.6; }
   canvas { width: 100%; height: 140px; display: block; }
+
+  /* Rest timer bar */
+  #rest-timer {
+    position: fixed; left: 12px; right: 12px; bottom: 86px; z-index: 15;
+    background: var(--ink); color: #fff; border-radius: 16px;
+    padding: 12px 16px; display: none; align-items: center; gap: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  }
+  #rest-timer.show { display: flex; animation: fadeUp .25s ease both; }
+  #rest-timer .rt-label { font-size: 14px; font-weight: 600; }
+  #rest-timer b { font-size: 22px; font-variant-numeric: tabular-nums; flex: 1; text-align: center; }
+  #rest-timer button {
+    background: rgba(255,255,255,0.15); color: #fff; border: none; border-radius: 999px;
+    padding: 8px 14px; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+
+  /* Confetti */
+  .confetti {
+    position: fixed; top: -14px; width: 10px; height: 14px; border-radius: 2px; z-index: 60;
+    animation: confetti-fall 1.9s ease-in forwards; pointer-events: none;
+  }
+  @keyframes confetti-fall {
+    to { transform: translateY(105vh) rotate(720deg); opacity: 0.85; }
+  }
+
+  /* Page transitions + touch feel */
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  #content > * { animation: fadeUp .28s ease both; }
+  .btn:active, .check-btn:active, .week-chip:active { transform: scale(0.96); }
+  .btn, .check-btn, .week-chip { transition: transform .12s ease; }
+
+  /* Onboarding overlay */
+  #onboarding {
+    position: fixed; inset: 0; z-index: 40; background: var(--pink-bg);
+    overflow-y: auto; padding: max(28px, env(safe-area-inset-top)) 20px 40px 20px;
+  }
+  #onboarding .inner { max-width: 480px; margin: 0 auto; }
+
+  /* Dark mode (follows the phone automatically) */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --pink-bg: #1C1318;
+      --card: #291E24;
+      --border: #3E2C35;
+      --ink: #F5EDF1;
+      --ink-soft: #CDBFC7;
+      --ink-muted: #9C8C95;
+      --pink-soft: #4A2A38;
+      --green-bg: #1F3A2C;
+      --shadow: 0 6px 20px rgba(0,0,0,0.4);
+    }
+    #tabbar { background: #241A20; border-top-color: var(--border); }
+    .card { box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
+    .hero-card { background: linear-gradient(135deg, #3A2330, #4A2A38); }
+    .quote-card { background: linear-gradient(135deg, #3A2330, #33202B); color: #F3BCD2; }
+    .badge { background: var(--pink-soft); color: #F3BCD2; }
+    .toast { background: #000; }
+  }
 </style>
 </head>
 <body>
@@ -175,6 +233,12 @@
     </nav>
   </div>
   <div class="toast" id="toast"></div>
+  <div id="rest-timer">
+    <span class="rt-label">⏱ Rest</span>
+    <b id="rest-time">1:30</b>
+    <button id="rest-plus" type="button">+30s</button>
+    <button id="rest-skip" type="button">Skip</button>
+  </div>
 
 <script>
 /* ============================= PROGRAM DATA ============================= */
@@ -273,6 +337,8 @@ function defaultState() {
     measurements: [],  // { date, weight, waist, hips }
     nutrition: {},      // date -> { calories, protein, water }
     openDay: null,
+    onboarded: false,
+    settings: { restSeconds: 90 },
   };
 }
 
@@ -347,8 +413,11 @@ function todayDayName() {
 }
 
 function bestWeightForExercise(exerciseName) {
+  return bestWeightForKey(exerciseKey(exerciseName));
+}
+
+function bestWeightForKey(k) {
   let best = null;
-  const k = exerciseKey(exerciseName);
   Object.values(state.logs).forEach(log => {
     const loggedEx = log.exercises[k];
     if (!loggedEx) return;
@@ -414,6 +483,75 @@ function weeklyGains(week) {
   return rows;
 }
 
+/* Total kg lifted + completed sets in a week */
+function weekVolume(week) {
+  let vol = 0, sets = 0;
+  PROGRAM_DAYS.forEach(day => {
+    const log = state.logs[dayKey(week, day)];
+    if (!log) return;
+    Object.values(log.exercises).forEach(ex => ex.sets.forEach(s => {
+      if (s.completed) { sets++; vol += (s.weight || 0) * (s.reps || 0); }
+    }));
+  });
+  return { vol: Math.round(vol), sets };
+}
+
+/* ============================= REST TIMER ============================= */
+let restInterval = null, restRemaining = 0;
+
+function startRestTimer(seconds) {
+  restRemaining = seconds || (state.settings && state.settings.restSeconds) || 90;
+  document.getElementById("rest-timer").classList.add("show");
+  updateRestUI();
+  clearInterval(restInterval);
+  restInterval = setInterval(() => {
+    restRemaining--;
+    if (restRemaining <= 0) {
+      stopRestTimer();
+      showToast("Rest over — go! 💪");
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      beep();
+    } else updateRestUI();
+  }, 1000);
+}
+
+function updateRestUI() {
+  document.getElementById("rest-time").textContent =
+    Math.floor(restRemaining / 60) + ":" + String(restRemaining % 60).padStart(2, "0");
+}
+
+function stopRestTimer() {
+  clearInterval(restInterval);
+  restInterval = null;
+  document.getElementById("rest-timer").classList.remove("show");
+}
+
+function beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 880; g.gain.value = 0.12;
+    o.start();
+    setTimeout(() => { o.stop(); ctx.close(); }, 300);
+  } catch (e) {}
+}
+
+/* ============================= CELEBRATIONS ============================= */
+function confettiBurst() {
+  const colors = ["#E8698F", "#AE375C", "#FBD9E6", "#4CAF7D", "#FFD166"];
+  for (let i = 0; i < 40; i++) {
+    const p = document.createElement("div");
+    p.className = "confetti";
+    p.style.left = (5 + Math.random() * 90) + "vw";
+    p.style.background = colors[i % colors.length];
+    p.style.animationDelay = (Math.random() * 0.4) + "s";
+    p.style.transform = "rotate(" + Math.floor(Math.random() * 360) + "deg)";
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 2500);
+  }
+}
+
 function currentStreak() {
   const completedDates = new Set();
   Object.entries(state.logs).forEach(([key, log]) => {
@@ -471,6 +609,7 @@ function ring(progress, size, label, sublabel) {
 /* ============================= TABS ============================= */
 let activeTab = "home";
 let editMode = false;
+let chartExercise = "Barbell Hip Thrust";
 
 function setTab(tab) {
   activeTab = tab;
@@ -481,6 +620,13 @@ function setTab(tab) {
 
 function render() {
   const content = document.getElementById("content");
+  if (!state.onboarded) {
+    document.getElementById("tabbar").style.display = "none";
+    content.innerHTML = renderOnboarding();
+    attachHandlers();
+    return;
+  }
+  document.getElementById("tabbar").style.display = "flex";
   if (activeTab === "home") content.innerHTML = renderHome();
   else if (activeTab === "workout") content.innerHTML = renderWorkout();
   else if (activeTab === "progress") content.innerHTML = renderProgress();
@@ -730,23 +876,29 @@ function renderDayPage(week, day) {
   const done = isDayFullyLogged(week, day);
   const doneCount = completedExerciseCount(week, day);
 
+  const lastWeekLog = state.logs[dayKey(week - 1, day)];
   let exercisesHtml = "";
   template.exercises.forEach(ex => {
     const k = exerciseKey(ex.name);
     const loggedEx = log.exercises[k];
+    const lastEx = lastWeekLog ? lastWeekLog.exercises[k] : null;
     let setsHtml = "";
     loggedEx.sets.forEach((s, si) => {
+      // Ghost-fill each set with what she lifted in the same set last week
+      const lastSet = lastEx && lastEx.sets[si];
+      const wPlaceholder = (lastSet && lastSet.weight != null) ? lastSet.weight : "kg";
+      const rPlaceholder = (lastSet && lastSet.reps != null) ? lastSet.reps : escapeHtml(ex.reps);
       setsHtml += `
         <div class="set-row">
           <span class="setnum">${si + 1}</span>
-          <input type="number" inputmode="decimal" placeholder="kg" value="${s.weight ?? ""}"
+          <input type="number" inputmode="decimal" placeholder="${wPlaceholder}" value="${s.weight ?? ""}"
             data-action="set-weight" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}" style="flex:1;" ${ex.track ? "" : "disabled"}/>
-          <input type="number" inputmode="numeric" placeholder="${escapeHtml(ex.reps)}" value="${s.reps ?? ""}"
+          <input type="number" inputmode="numeric" placeholder="${rPlaceholder}" value="${s.reps ?? ""}"
             data-action="set-reps" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}" style="flex:1;"/>
           <button class="check-btn ${s.completed ? "done" : ""}" data-action="toggle-set" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}">✓</button>
         </div>`;
     });
-    // Last week's top weight for this exercise, and change if she's lifted this week
+    // Last week's top weight, change so far, and a progression suggestion
     let lastWeekHtml = "";
     if (ex.track) {
       const lastW = weekMaxForExercise(week - 1, ex.name);
@@ -758,6 +910,9 @@ function renderDayPage(week, day) {
           deltaHtml = d > 0 ? ` <b style="color:var(--green);">▲ +${d}kg</b>` :
                       d < 0 ? ` <b style="color:var(--pink-dark);">▼ ${d}kg</b>` :
                       ` <span style="color:var(--ink-muted);">same as last week</span>`;
+        } else if (lastEx && lastEx.sets.length && lastEx.sets.every(s => s.completed)) {
+          // She completed every set last week — nudge her up
+          deltaHtml = ` <b style="color:var(--pink-dark);">💡 Try ${+(lastW + 2.5).toFixed(1)}kg</b>`;
         }
         lastWeekHtml = `<div style="font-size:13px;color:var(--ink-soft);margin:-6px 0 8px 0;">Last week: <b>${lastW}kg</b>${deltaHtml}</div>`;
       }
@@ -795,6 +950,19 @@ function renderDayPage(week, day) {
       ${exercisesHtml}
       <button class="btn secondary" style="margin-top:16px;" data-action="finish-day" data-week="${week}" data-day="${day}">Mark Day Complete</button>
     </div>
+    <div class="card">
+      <h3 class="section-title" style="margin-bottom:8px;">Plate calculator 🏋️</h3>
+      <div class="row" style="gap:8px;">
+        <input type="number" id="plate-weight" inputmode="decimal" placeholder="Total kg" style="flex:1;"/>
+        <select id="plate-bar" style="flex:1;background:var(--pink-bg);border:1px solid var(--border);border-radius:12px;padding:12px;font-size:16px;color:var(--ink);">
+          <option value="20">20kg bar</option>
+          <option value="15">15kg bar</option>
+          <option value="10">10kg bar</option>
+          <option value="0">Machine / no bar</option>
+        </select>
+      </div>
+      <div id="plate-result" class="empty-hint" style="margin-top:10px;">Type the total weight to see plates per side.</div>
+    </div>
     <button class="btn outline" data-action="back-to-days" style="margin-bottom:8px;">‹ Back to all workouts</button>
   `;
 }
@@ -827,9 +995,34 @@ function renderProgress() {
       </div>`;
   }).join("");
 
+  const wk = state.currentWeek;
+  const recapThis = weekVolume(wk);
+  const recapLast = weekVolume(wk - 1);
+  const volDelta = recapLast.vol > 0 ? Math.round(((recapThis.vol - recapLast.vol) / recapLast.vol) * 100) : null;
+
+  const allTracked = [];
+  const seenEx = new Set();
+  PROGRAM_DAYS.forEach(d => state.program[d].exercises.forEach(ex => {
+    if (ex.track && !seenEx.has(exerciseKey(ex.name))) { seenEx.add(exerciseKey(ex.name)); allTracked.push(ex.name); }
+  }));
+  if (!allTracked.includes(chartExercise)) chartExercise = allTracked[0] || "Barbell Hip Thrust";
+  const exPoints = exerciseHistory(chartExercise);
+
   return `
     <h1 class="page-title">Progress</h1>
     <p class="page-sub">Your transformation, visualised</p>
+
+    <div class="card hero-card">
+      <div class="row between" style="margin-bottom:10px;">
+        <h3 class="section-title" style="margin:0;">Week ${wk} recap</h3>
+        ${volDelta != null ? `<span style="font-weight:800;color:${volDelta >= 0 ? "var(--green)" : "var(--pink-dark)"};">${volDelta >= 0 ? "▲ +" : "▼ "}${volDelta}% vs last week</span>` : ""}
+      </div>
+      <div class="grid2">
+        <div class="stat-pill"><div class="label">Total lifted</div><div class="value" style="font-size:19px;">${recapThis.vol.toLocaleString()}kg</div></div>
+        <div class="stat-pill"><div class="label">Sets done</div><div class="value" style="font-size:19px;">${recapThis.sets}</div></div>
+      </div>
+      ${recapLast.vol > 0 ? `<div style="font-size:13px;color:var(--ink-soft);margin-top:8px;">Last week: ${recapLast.vol.toLocaleString()}kg across ${recapLast.sets} sets</div>` : ""}
+    </div>
 
     <div class="card">
       <div class="row between" style="margin-bottom:4px;">
@@ -841,8 +1034,11 @@ function renderProgress() {
     </div>
 
     <div class="card">
-      <h3 class="section-title">Hip Thrust (kg)</h3>
-      ${hipThrust.length >= 2 ? `<canvas id="chart-hipthrust"></canvas>` : `<div class="empty-hint">Log a couple of weeks to see your trend here.</div>`}
+      <h3 class="section-title">Exercise trend (kg)</h3>
+      <select id="ex-picker" style="width:100%;background:var(--pink-bg);border:1px solid var(--border);border-radius:12px;padding:12px;font-size:16px;color:var(--ink);margin-bottom:10px;">
+        ${allTracked.map(n => `<option value="${escapeHtml(n)}" ${n === chartExercise ? "selected" : ""}>${escapeHtml(n)}</option>`).join("")}
+      </select>
+      ${exPoints.length >= 2 ? `<canvas id="chart-ex"></canvas>` : `<div class="empty-hint">Log ${escapeHtml(chartExercise)} for a couple of weeks to see your trend here.</div>`}
     </div>
 
     <div class="card">
@@ -881,7 +1077,7 @@ function renderProgress() {
 }
 
 function drawAllCharts() {
-  drawLineChart("chart-hipthrust", exerciseHistory("Barbell Hip Thrust"));
+  drawLineChart("chart-ex", exerciseHistory(chartExercise));
   const weightData = state.measurements.filter(m => m.weight != null).map(m => ({ x: m.date.slice(5), y: m.weight }));
   const hipsData = state.measurements.filter(m => m.hips != null).map(m => ({ x: m.date.slice(5), y: m.hips }));
   drawLineChart("chart-weight", weightData);
@@ -1015,9 +1211,13 @@ function renderProfile() {
         <span style="font-size:14px;">Protein Target (g)</span>
         <input type="number" inputmode="numeric" style="width:90px;" value="${g.proteinTarget ?? ""}" data-action="set-goal" data-field="proteinTarget"/>
       </div>
-      <div class="row between">
+      <div class="row between" style="margin-bottom:8px;">
         <span style="font-size:14px;">Water Target (L)</span>
         <input type="number" inputmode="decimal" style="width:90px;" value="${g.waterTarget ?? ""}" data-action="set-goal" data-field="waterTarget"/>
+      </div>
+      <div class="row between">
+        <span style="font-size:14px;">Rest Timer (seconds)</span>
+        <input type="number" inputmode="numeric" style="width:90px;" value="${(state.settings && state.settings.restSeconds) ?? 90}" data-action="set-rest"/>
       </div>
     </div>
 
@@ -1043,8 +1243,64 @@ function renderProfile() {
     </div>
 
     <div class="card">
+      <h3 class="section-title">Backup 🔐</h3>
+      <p class="empty-hint" style="margin-top:-4px;">Your data lives only on this phone. Save a backup every so often so you can never lose your progress.</p>
+      <button class="btn" style="margin-bottom:10px;" data-action="export-data">⬇️ Backup My Data</button>
+      <label class="btn secondary" style="margin-bottom:2px;">
+        📂 Restore From Backup
+        <input type="file" id="restore-file" accept=".json,application/json" style="display:none;width:auto;"/>
+      </label>
+    </div>
+
+    <div class="card">
       <h3 class="section-title">Data</h3>
       <button class="btn outline" data-action="reset-data">Reset All Data</button>
+    </div>
+  `;
+}
+
+/* ============================= ONBOARDING ============================= */
+function renderOnboarding() {
+  const g = state.goals;
+  return `
+    <div style="max-width:480px;margin:0 auto;padding-top:16px;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:52px;">🍑</div>
+        <h1 class="page-title" style="margin-bottom:4px;">Welcome to Glute Gains</h1>
+        <p class="page-sub" style="margin-bottom:0;">30 seconds of setup, then it's all about you.</p>
+      </div>
+
+      <div class="card">
+        <h3 class="section-title">What should I call you?</h3>
+        <input type="text" id="ob-name" value="${escapeHtml(state.name || "")}" placeholder="Your name"/>
+      </div>
+
+      <div class="card">
+        <h3 class="section-title">Your body goals</h3>
+        <div class="grid2" style="margin-bottom:4px;">
+          <div><div style="font-size:13px;color:var(--ink-soft);margin-bottom:4px;">Weight now (kg)</div><input type="number" inputmode="decimal" id="ob-weight" value="${g.weightKg ?? ""}"/></div>
+          <div><div style="font-size:13px;color:var(--ink-soft);margin-bottom:4px;">Goal weight (kg)</div><input type="number" inputmode="decimal" id="ob-goal-weight" value="${g.goalWeightKg ?? ""}"/></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="section-title">Your strength goals</h3>
+        <div class="grid2" style="margin-bottom:4px;">
+          <div><div style="font-size:13px;color:var(--ink-soft);margin-bottom:4px;">Hip thrust now (kg)</div><input type="number" inputmode="decimal" id="ob-hip" value="${g.hipThrustKg ?? ""}"/></div>
+          <div><div style="font-size:13px;color:var(--ink-soft);margin-bottom:4px;">Goal hip thrust (kg)</div><input type="number" inputmode="decimal" id="ob-goal-hip" value="${g.goalHipThrustKg ?? ""}"/></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="section-title">Daily fuel targets</h3>
+        <div class="grid2" style="margin-bottom:4px;">
+          <div><div style="font-size:13px;color:var(--ink-soft);margin-bottom:4px;">Protein (g)</div><input type="number" inputmode="numeric" id="ob-protein" value="${g.proteinTarget ?? 130}"/></div>
+          <div><div style="font-size:13px;color:var(--ink-soft);margin-bottom:4px;">Water (L)</div><input type="number" inputmode="decimal" id="ob-water" value="${g.waterTarget ?? 2.5}"/></div>
+        </div>
+      </div>
+
+      <button class="btn" data-action="finish-onboarding">Let's go 🍑</button>
+      <div class="empty-hint" style="text-align:center;margin-top:10px;">Everything can be changed later in Profile. Leave anything blank to skip it.</div>
     </div>
   `;
 }
@@ -1092,8 +1348,24 @@ function attachHandlers() {
         const { week, day, ex, set } = el.dataset;
         const log = getDayLog(Number(week), day);
         const s = log.exercises[ex].sets[set];
-        s.completed = !s.completed;
+        const completing = !s.completed;
+        // Personal best check (before this set counts)
+        let isPB = false;
+        if (completing && s.weight != null) {
+          const prevBest = bestWeightForKey(ex);
+          if (prevBest != null && s.weight > prevBest) isPB = true;
+        }
+        s.completed = completing;
         save(); render();
+        if (completing) {
+          startRestTimer();
+          if (isPB) {
+            showToast("New PB — " + s.weight + "kg! 🎉");
+            confettiBurst();
+          }
+        } else {
+          stopRestTimer();
+        }
       };
     }
     if (action === "set-weight" || action === "set-reps") {
@@ -1113,7 +1385,9 @@ function attachHandlers() {
         log.dayCompleted = true;
         log.completedDate = todayISO();
         save();
+        stopRestTimer();
         showToast("Workout logged! 🍑");
+        confettiBurst();
         render();
       };
     }
@@ -1211,12 +1485,101 @@ function attachHandlers() {
         if (confirm("This will erase all your logged workouts, measurements and nutrition. Are you sure?")) {
           localStorage.removeItem(STORAGE_KEY);
           state = defaultState();
+          state.onboarded = true;
           render();
           showToast("Data reset");
         }
       };
     }
+    if (action === "export-data") {
+      el.onclick = () => {
+        const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "glute-gains-backup-" + todayISO() + ".json";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+        showToast("Backup saved 📦");
+      };
+    }
+    if (action === "set-rest") {
+      el.oninput = () => {
+        if (!state.settings) state.settings = {};
+        state.settings.restSeconds = Math.max(10, Number(el.value) || 90);
+        save();
+      };
+    }
+    if (action === "finish-onboarding") {
+      el.onclick = () => {
+        const v = id => { const n = document.getElementById(id); return n && n.value !== "" ? Number(n.value) : null; };
+        const nameEl = document.getElementById("ob-name");
+        if (nameEl && nameEl.value.trim()) state.name = nameEl.value.trim();
+        state.goals.weightKg = v("ob-weight") ?? state.goals.weightKg;
+        state.goals.goalWeightKg = v("ob-goal-weight") ?? state.goals.goalWeightKg;
+        state.goals.hipThrustKg = v("ob-hip") ?? state.goals.hipThrustKg;
+        state.goals.goalHipThrustKg = v("ob-goal-hip") ?? state.goals.goalHipThrustKg;
+        state.goals.proteinTarget = v("ob-protein") ?? state.goals.proteinTarget;
+        state.goals.waterTarget = v("ob-water") ?? state.goals.waterTarget;
+        if (v("ob-weight") != null) state.measurements.push({ date: todayISO(), weight: v("ob-weight"), waist: null, hips: null });
+        state.onboarded = true;
+        save();
+        render();
+        confettiBurst();
+        showToast("Let's build those glutes! 🍑");
+      };
+    }
   });
+
+  /* Plate calculator (only present on a workout day page) */
+  const pw = document.getElementById("plate-weight");
+  if (pw) {
+    const calc = () => {
+      const total = Number(pw.value);
+      const bar = Number(document.getElementById("plate-bar").value);
+      const out = document.getElementById("plate-result");
+      if (!total) { out.textContent = "Type the total weight to see plates per side."; return; }
+      if (total < bar) { out.textContent = "That's lighter than the bar itself."; return; }
+      let perSide = (total - bar) / 2;
+      const plates = [25, 20, 15, 10, 5, 2.5, 1.25];
+      const used = [];
+      plates.forEach(p => { while (perSide >= p - 0.001) { used.push(p); perSide -= p; } });
+      out.innerHTML = used.length
+        ? `Each side: <b>${used.join(" + ")}</b> kg${perSide > 0.01 ? ` <span style="color:var(--ink-muted);">(${perSide.toFixed(2)}kg can't be plated)</span>` : ""}`
+        : "Just the bar 🙂";
+    };
+    pw.oninput = calc;
+    document.getElementById("plate-bar").onchange = calc;
+  }
+
+  /* Restore from backup (only present on profile page) */
+  const rf = document.getElementById("restore-file");
+  if (rf) {
+    rf.onchange = () => {
+      const f = rf.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(reader.result);
+          if (!parsed || typeof parsed !== "object" || !parsed.program || !("logs" in parsed)) throw new Error("bad file");
+          state = Object.assign(defaultState(), parsed);
+          state.onboarded = true;
+          save(); render();
+          showToast("Backup restored ✅");
+        } catch (e) {
+          showToast("That file doesn't look like a Glute Gains backup");
+        }
+      };
+      reader.readAsText(f);
+    };
+  }
+
+  /* Exercise trend picker (only present on progress page) */
+  const exPicker = document.getElementById("ex-picker");
+  if (exPicker) {
+    exPicker.onchange = () => { chartExercise = exPicker.value; render(); };
+  }
 }
 
 /* ============================= BOOT ============================= */
@@ -1231,6 +1594,10 @@ document.querySelectorAll("#tabbar .tab-btn").forEach(btn => {
   });
 });
 setTab("home");
+
+/* Rest timer controls */
+document.getElementById("rest-plus").onclick = () => { restRemaining += 30; updateRestUI(); };
+document.getElementById("rest-skip").onclick = () => stopRestTimer();
 
 /* Service worker: makes the app work offline once installed */
 if ("serviceWorker" in navigator) {
