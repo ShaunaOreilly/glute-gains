@@ -1,5 +1,5 @@
 /* Glute Gains service worker — caches the app so it works offline */
-const CACHE = "glute-gains-v1";
+const CACHE = "glute-gains-v2";
 const ASSETS = [
   ".",
   "index.html",
