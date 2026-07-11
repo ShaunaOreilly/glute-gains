@@ -379,6 +379,41 @@ function exerciseHistory(exerciseName) {
   return points;
 }
 
+function weekMaxForExercise(week, exerciseName) {
+  if (week < 1) return null;
+  const k = exerciseKey(exerciseName);
+  let maxW = null;
+  PROGRAM_DAYS.forEach(day => {
+    const log = state.logs[dayKey(week, day)];
+    if (!log) return;
+    const ex = log.exercises[k];
+    if (!ex) return;
+    ex.sets.forEach(s => {
+      if (s.completed && s.weight != null) maxW = maxW === null ? s.weight : Math.max(maxW, s.weight);
+    });
+  });
+  return maxW;
+}
+
+/* Weekly change per exercise: compares this week's top weight to last week's */
+function weeklyGains(week) {
+  const seen = new Set();
+  const rows = [];
+  PROGRAM_DAYS.forEach(day => {
+    state.program[day].exercises.forEach(ex => {
+      if (!ex.track) return;
+      const k = exerciseKey(ex.name);
+      if (seen.has(k)) return;
+      seen.add(k);
+      const thisW = weekMaxForExercise(week, ex.name);
+      const lastW = weekMaxForExercise(week - 1, ex.name);
+      if (thisW == null && lastW == null) return;
+      rows.push({ name: ex.name, thisW, lastW, delta: (thisW != null && lastW != null) ? +(thisW - lastW).toFixed(2) : null });
+    });
+  });
+  return rows;
+}
+
 function currentStreak() {
   const completedDates = new Set();
   Object.entries(state.logs).forEach(([key, log]) => {
@@ -711,10 +746,27 @@ function renderDayPage(week, day) {
           <button class="check-btn ${s.completed ? "done" : ""}" data-action="toggle-set" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}">✓</button>
         </div>`;
     });
+    // Last week's top weight for this exercise, and change if she's lifted this week
+    let lastWeekHtml = "";
+    if (ex.track) {
+      const lastW = weekMaxForExercise(week - 1, ex.name);
+      const thisW = weekMaxForExercise(week, ex.name);
+      if (lastW != null) {
+        let deltaHtml = "";
+        if (thisW != null) {
+          const d = +(thisW - lastW).toFixed(2);
+          deltaHtml = d > 0 ? ` <b style="color:var(--green);">▲ +${d}kg</b>` :
+                      d < 0 ? ` <b style="color:var(--pink-dark);">▼ ${d}kg</b>` :
+                      ` <span style="color:var(--ink-muted);">same as last week</span>`;
+        }
+        lastWeekHtml = `<div style="font-size:13px;color:var(--ink-soft);margin:-6px 0 8px 0;">Last week: <b>${lastW}kg</b>${deltaHtml}</div>`;
+      }
+    }
     exercisesHtml += `
       <div class="exercise-row">
         <div class="exercise-title">${escapeHtml(ex.name)}</div>
         <div class="exercise-target">Target: ${ex.sets} x ${escapeHtml(ex.reps)}</div>
+        ${lastWeekHtml}
         ${setsHtml}
       </div>`;
   });
@@ -755,9 +807,38 @@ function renderProgress() {
   const hipsData = measurements.filter(m => m.hips != null).map(m => ({ x: m.date.slice(5), y: m.hips }));
   const totalSets = Object.values(state.logs).reduce((a, l) => a + Object.values(l.exercises).reduce((b, ex) => b + ex.sets.filter(s => s.completed).length, 0), 0);
 
+  const gains = weeklyGains(state.currentWeek);
+  const gainsRows = gains.map(g => {
+    let right;
+    if (g.thisW != null && g.lastW != null) {
+      const badge = g.delta > 0 ? `<b style="color:var(--green);">▲ +${g.delta}kg</b>` :
+                    g.delta < 0 ? `<b style="color:var(--pink-dark);">▼ ${g.delta}kg</b>` :
+                    `<span style="color:var(--ink-muted);">—</span>`;
+      right = `${g.lastW}kg → <b>${g.thisW}kg</b> &nbsp;${badge}`;
+    } else if (g.thisW != null) {
+      right = `<b>${g.thisW}kg</b> <span style="color:var(--ink-muted);">this week</span>`;
+    } else {
+      right = `${g.lastW}kg <span style="color:var(--ink-muted);">last week — not lifted yet</span>`;
+    }
+    return `
+      <div class="row between" style="padding:9px 0;border-top:1px solid var(--border);">
+        <span style="font-size:14px;font-weight:600;flex:1;padding-right:8px;">${escapeHtml(g.name)}</span>
+        <span style="font-size:14px;color:var(--ink-soft);white-space:nowrap;">${right}</span>
+      </div>`;
+  }).join("");
+
   return `
     <h1 class="page-title">Progress</h1>
     <p class="page-sub">Your transformation, visualised</p>
+
+    <div class="card">
+      <div class="row between" style="margin-bottom:4px;">
+        <h3 class="section-title" style="margin:0;">Strength gains 💪</h3>
+        <span style="font-size:13px;color:var(--ink-muted);">Week ${state.currentWeek} vs ${state.currentWeek > 1 ? "Week " + (state.currentWeek - 1) : "start"}</span>
+      </div>
+      <div style="font-size:13px;color:var(--ink-muted);margin-bottom:6px;">Top weight per exercise, this week vs last</div>
+      ${gains.length ? gainsRows : `<div class="empty-hint">Log your weights during workouts and your weekly increases will show up here.</div>`}
+    </div>
 
     <div class="card">
       <h3 class="section-title">Hip Thrust (kg)</h3>
