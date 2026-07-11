@@ -471,32 +471,100 @@ function renderHome() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
+  // Today's progress through the workout
+  const doneToday = isTrainingDay ? completedExerciseCount(week, today) : 0;
+  const totalToday = template ? template.exercises.length : 0;
+  const todayProgress = totalToday ? doneToday / totalToday : 0;
+  const todayDone = totalToday > 0 && doneToday >= totalToday;
+  const heroBtn = !template ? "" :
+    todayDone ? `<button class="btn small" data-action="go-today">Done — nice work! ✅</button>` :
+    doneToday > 0 ? `<button class="btn small" data-action="go-today">Continue (${doneToday}/${totalToday} done)</button>` :
+    `<button class="btn small" data-action="go-today">Start Workout</button>`;
+
+  // Nutrition vs her targets
+  const proteinTarget = state.goals.proteinTarget || 130;
+  const waterTarget = state.goals.waterTarget || 2.5;
+  const proteinPct = Math.min(100, Math.round(((nut.protein || 0) / proteinTarget) * 100));
+  const waterPct = Math.min(100, Math.round(((nut.water || 0) / waterTarget) * 100));
+
+  // Hip thrust: best logged weight vs her goal
+  const hipBest = bestWeightForExercise("Barbell Hip Thrust") || state.goals.hipThrustKg;
+  const hipGoal = state.goals.goalHipThrustKg;
+  const hipPct = hipBest && hipGoal ? Math.min(100, Math.round((hipBest / hipGoal) * 100)) : 0;
+
+  // Body weight vs goal
+  const latestM = state.measurements.length ? state.measurements[state.measurements.length - 1] : null;
+  const curWeight = (latestM && latestM.weight) || state.goals.weightKg;
+
+  const goalsCard = (hipGoal || state.goals.goalWeightKg) ? `
+    <div class="card">
+      ${hipGoal ? `
+        <div class="row between" style="margin-bottom:6px;">
+          <span style="font-weight:700;">Hip Thrust PB</span>
+          <span style="color:var(--ink-soft);">${hipBest ? hipBest + "kg" : "—"} / <b style="color:var(--pink-dark);">${hipGoal}kg goal</b></span>
+        </div>
+        <div class="progress-track" style="margin-bottom:${state.goals.goalWeightKg ? "14px" : "0"};"><div class="progress-fill" style="width:${hipPct}%;"></div></div>` : ""}
+      ${state.goals.goalWeightKg ? `
+        <div class="row between">
+          <span style="font-weight:700;">Weight</span>
+          <span style="color:var(--ink-soft);">${curWeight ? curWeight + "kg" : "—"} → <b style="color:var(--pink-dark);">${state.goals.goalWeightKg}kg goal</b></span>
+        </div>` : ""}
+    </div>` : `
+    <div class="card" style="text-align:center;">
+      <div style="font-weight:700;margin-bottom:6px;">Make it yours 🎯</div>
+      <div style="font-size:14px;color:var(--ink-soft);margin-bottom:12px;">Set your hip thrust and weight goals so I can track them here for you.</div>
+      <button class="btn small secondary" data-action="go-tab" data-tab="profile">Set my goals</button>
+    </div>`;
+
   return `
     <p class="page-sub" style="margin-bottom:0;">${greeting},</p>
     <h1 class="page-title" style="margin-bottom:16px;">${escapeHtml(greetName)} 🍑</h1>
 
     <div class="card hero-card row" style="align-items:center;">
-      ${ring(weekProgress, 92, "Week " + week)}
+      ${isTrainingDay ? ring(todayProgress, 92, doneToday + "/" + totalToday, "today") : ring(weekProgress, 92, "Week " + week)}
       <div style="flex:1;margin-left:16px;">
-        <div class="badge" style="background:#fff;">Today's Workout</div>
+        <div class="badge" style="background:#fff;">Today · ${today}</div>
         <div style="font-size:22px;font-weight:800;line-height:1.25;margin:6px 0 3px 0;">${template ? template.title : "Rest Day"}</div>
-        <div style="font-size:14px;color:var(--ink-soft);margin-bottom:12px;">${template ? template.exercises.length + " exercises · " + today : "Recovery is part of the plan"}</div>
-        ${template ? `<button class="btn small" data-action="go-today">Start Workout</button>` : ""}
+        <div style="font-size:14px;color:var(--ink-soft);margin-bottom:12px;">${template ? (todayDone ? "All " + totalToday + " exercises logged 💪" : totalToday + " exercises") : "Recovery is part of the plan"}</div>
+        ${heroBtn}
       </div>
     </div>
 
-    <h3 class="section-title" style="margin-top:20px;">Your stats</h3>
-    <div class="grid2" style="margin-bottom:10px;">
+    <div class="card">
+      <div class="row between" style="margin-bottom:8px;">
+        <span style="font-weight:700;">This week</span>
+        <span style="font-size:14px;color:var(--ink-soft);">${doneExInWeek} of ${totalExInWeek} exercises · Week ${week} of 12</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" style="width:${Math.round(weekProgress*100)}%;"></div></div>
+    </div>
+
+    <div class="grid2" style="margin-bottom:16px;">
       <div class="stat-pill"><div class="label">🔥 Streak</div><div class="value">${streak} day${streak===1?"":"s"}</div></div>
       <div class="stat-pill"><div class="label">🏋️ Workouts</div><div class="value">${totalWorkouts}</div></div>
     </div>
 
-    <h3 class="section-title" style="margin-top:20px;">Today's nutrition</h3>
-    <div class="grid3" style="margin-bottom:18px;">
-      <div class="stat-pill"><div class="label">Calories</div><div class="value" style="font-size:18px;">${nut.calories ?? "—"}</div></div>
-      <div class="stat-pill"><div class="label">Protein</div><div class="value" style="font-size:18px;">${nut.protein ? nut.protein+"g" : "—"}</div></div>
-      <div class="stat-pill"><div class="label">Water</div><div class="value" style="font-size:18px;">${nut.water ? nut.water+"L" : "—"}</div></div>
+    <div class="card">
+      <div class="row between" style="margin-bottom:10px;">
+        <h3 class="section-title" style="margin:0;">Today's nutrition</h3>
+        <button class="btn small ghost" data-action="go-tab" data-tab="nutrition" style="padding:4px 8px;min-height:0;">Log →</button>
+      </div>
+      <div class="row between" style="margin-bottom:5px;">
+        <span style="font-size:14px;font-weight:600;">Protein</span>
+        <span style="font-size:14px;color:var(--ink-soft);">${nut.protein || 0}g / ${proteinTarget}g</span>
+      </div>
+      <div class="progress-track" style="height:8px;margin-bottom:12px;"><div class="progress-fill" style="width:${proteinPct}%;"></div></div>
+      <div class="row between" style="margin-bottom:5px;">
+        <span style="font-size:14px;font-weight:600;">Water</span>
+        <span style="font-size:14px;color:var(--ink-soft);">${nut.water || 0}L / ${waterTarget}L</span>
+      </div>
+      <div class="progress-track" style="height:8px;margin-bottom:12px;"><div class="progress-fill" style="width:${waterPct}%;"></div></div>
+      <div class="row between">
+        <span style="font-size:14px;font-weight:600;">Calories</span>
+        <span style="font-size:14px;color:var(--ink-soft);">${nut.calories ?? "—"}</span>
+      </div>
     </div>
+
+    ${goalsCard}
 
     <div class="quote-card">✨ ${QUOTES[week] || QUOTES[1]}</div>
   `;
@@ -851,6 +919,9 @@ function attachHandlers() {
           setTab("workout");
         }
       };
+    }
+    if (action === "go-tab") {
+      el.onclick = () => setTab(el.dataset.tab);
     }
     if (action === "set-week") {
       el.onclick = () => { state.currentWeek = Number(el.dataset.week); save(); render(); };
