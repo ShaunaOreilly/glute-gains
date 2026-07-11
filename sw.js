@@ -1,5 +1,5 @@
-/* Glute Gains service worker — caches the app so it works offline */
-const CACHE = "glute-gains-v2";
+/* Glute Gains service worker — offline support with instant updates */
+const CACHE = "glute-gains-v3";
 const ASSETS = [
   ".",
   "index.html",
@@ -25,6 +25,23 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
+
+  // Pages (the app itself): network first so updates show up immediately,
+  // cached copy only when offline.
+  if (e.request.mode === "navigate" || e.request.destination === "document") {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy));
+          return res;
+        })
+        .catch(() => caches.match(e.request, { ignoreSearch: true }).then((m) => m || caches.match("index.html")))
+    );
+    return;
+  }
+
+  // Everything else (icons, manifest): cache first, fine to be sticky.
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(
       (cached) =>
