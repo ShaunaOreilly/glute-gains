@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Glute Gains</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#FFF5F8" />
+<meta name="apple-mobile-web-app-title" content="Glute Gains" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<style>
+  :root {
+    --pink: #E8698F;
+    --pink-dark: #AE375C;
+    --pink-soft: #FBD9E6;
+    --pink-bg: #FFF7FA;
+    --card: #FFFFFF;
+    --border: #F3DDE6;
+    --ink: #2B2B31;
+    --ink-soft: #5B5B63;
+    --ink-muted: #9A939C;
+    --green: #4CAF7D;
+    --green-bg: #E4F5EC;
+    --shadow: 0 6px 20px rgba(174, 55, 92, 0.10);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--pink-bg);
+    color: var(--ink);
+    overscroll-behavior-y: none;
+  }
+  #app { display: flex; flex-direction: column; min-height: 100vh; }
+  #content {
+    flex: 1;
+    padding: max(16px, env(safe-area-inset-top)) 16px 100px 16px;
+    max-width: 560px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  h1.page-title { font-size: 26px; font-weight: 800; margin: 4px 0 2px 0; letter-spacing: -0.4px; }
+  p.page-sub { color: var(--ink-soft); font-size: 14px; margin: 0 0 18px 0; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .row.between { justify-content: space-between; }
+  .row.wrap { flex-wrap: wrap; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .stat-pill {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 12px;
+  }
+  .stat-pill .label { font-size: 10px; font-weight: 700; letter-spacing: 0.4px; color: var(--ink-muted); text-transform: uppercase; }
+  .stat-pill .value { font-size: 20px; font-weight: 800; margin-top: 2px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--pink), var(--pink-dark));
+    color: #fff; border: none; border-radius: 999px;
+    padding: 13px 22px; font-size: 15px; font-weight: 700;
+    cursor: pointer; width: 100%;
+  }
+  .btn.secondary {
+    background: var(--pink-soft); color: var(--pink-dark);
+  }
+  .btn.outline {
+    background: transparent; color: var(--pink-dark); border: 1.5px solid var(--pink);
+  }
+  .btn.small { padding: 8px 14px; font-size: 13px; width: auto; }
+  .btn.ghost { background: transparent; color: var(--ink-soft); }
+  .progress-track {
+    height: 10px; border-radius: 999px; background: var(--pink-soft); overflow: hidden;
+  }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--pink), var(--pink-dark)); border-radius: 999px; transition: width .3s ease; }
+  .ring-wrap { position: relative; width: 88px; height: 88px; flex-shrink: 0; }
+  .ring-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+  .ring-label b { font-size: 16px; }
+  .ring-label span { font-size: 10px; color: var(--ink-muted); }
+  input, textarea {
+    font-family: inherit; background: var(--pink-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 9px 10px; font-size: 14px; color: var(--ink); width: 100%;
+  }
+  input:focus, textarea:focus { outline: 2px solid var(--pink-soft); border-color: var(--pink); }
+  .week-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 16px; }
+  .week-chip {
+    flex-shrink: 0; width: 46px; height: 46px; border-radius: 23px; display: flex;
+    align-items: center; justify-content: center; font-weight: 700; font-size: 14px;
+    background: var(--card); border: 1px solid var(--border); color: var(--ink); cursor: pointer;
+  }
+  .week-chip.active { background: var(--pink); color: #fff; border-color: var(--pink); }
+  .day-card { margin-bottom: 12px; }
+  .day-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+  .day-icon {
+    width: 42px; height: 42px; border-radius: 12px; background: var(--pink-soft);
+    display: flex; align-items: center; justify-content: center; font-size: 18px; margin-right: 12px;
+  }
+  .day-icon.done { background: var(--green-bg); }
+  .exercise-row { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
+  .exercise-title { font-weight: 700; font-size: 14.5px; }
+  .exercise-target { font-size: 12px; color: var(--ink-muted); margin-bottom: 8px; }
+  .set-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .set-row .setnum { width: 18px; font-size: 12px; color: var(--ink-muted); }
+  .set-row input { text-align: center; padding: 7px 4px; font-size: 13px; }
+  .check-btn {
+    width: 30px; height: 30px; border-radius: 15px; border: none; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; background: var(--pink-soft); color: var(--pink-dark); font-size: 15px; cursor: pointer;
+  }
+  .check-btn.done { background: var(--green); color: #fff; }
+  .badge {
+    display: inline-block; background: var(--pink-soft); color: var(--pink-dark);
+    font-size: 10px; font-weight: 700; letter-spacing: 0.3px; padding: 3px 9px; border-radius: 999px; text-transform: uppercase;
+  }
+  .tag {
+    display: inline-block; background: var(--pink-bg); border: 1px solid var(--border); color: var(--ink-soft);
+    font-size: 11px; padding: 3px 9px; border-radius: 999px; margin: 0 4px 4px 0;
+  }
+  #tabbar {
+    position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--border);
+    display: flex; padding: 8px 6px max(8px, env(safe-area-inset-bottom)) 6px; z-index: 10;
+  }
+  .tab-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none;
+    color: var(--ink-muted); font-size: 10.5px; font-weight: 600; padding: 6px 0; cursor: pointer;
+  }
+  .tab-btn.active { color: var(--pink-dark); }
+  .tab-icon { font-size: 20px; line-height: 1; }
+  h3.section-title { font-size: 16px; font-weight: 800; margin: 0 0 10px 0; }
+  .empty-hint { color: var(--ink-muted); font-size: 13px; padding: 6px 0; }
+  .quote-card {
+    background: linear-gradient(135deg, var(--pink-soft), #FDEDF3);
+    border-radius: 18px; padding: 16px; font-style: italic; font-weight: 700; font-size: 15px; color: var(--pink-dark);
+    margin-bottom: 14px;
+  }
+  a.link { color: var(--pink-dark); font-weight: 700; text-decoration: none; }
+  .toast {
+    position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 13px;
+    opacity: 0; pointer-events: none; transition: opacity .25s ease; z-index: 20;
+  }
+  .toast.show { opacity: 0.95; }
+  .install-steps { font-size: 13px; color: var(--ink-soft); line-height: 1.6; }
+  canvas { width: 100%; height: 140px; display: block; }
+</style>
+</head>
+<body>
+  <div id="app">
+    <main id="content"></main>
+    <nav id="tabbar">
+      <button class="tab-btn" data-tab="home"><span class="tab-icon">🏠</span>Home</button>
+      <button class="tab-btn" data-tab="workout"><span class="tab-icon">🏋️‍♀️</span>Workout</button>
+      <button class="tab-btn" data-tab="progress"><span class="tab-icon">📈</span>Progress</button>
+      <button class="tab-btn" data-tab="nutrition"><span class="tab-icon">🍽️</span>Nutrition</button>
+      <button class="tab-btn" data-tab="profile"><span class="tab-icon">👤</span>Profile</button>
+    </nav>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+/* ============================= PROGRAM DATA ============================= */
+const PROGRAM_DAYS = ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"];
+
+const DEFAULT_PROGRAM = {
+  Monday: {
+    title: "Heavy Glutes & Hamstrings",
+    warmup: ["Incline Walk – 5 min", "Banded Walks – 2x15", "Glute Bridges – 2x15", "Frog Pumps – 2x20"],
+    exercises: [
+      { name: "Barbell Hip Thrust", sets: 4, reps: "8", track: true },
+      { name: "Romanian Deadlift", sets: 4, reps: "8-10", track: true },
+      { name: "Bulgarian Split Squat", sets: 3, reps: "10 each leg", track: true },
+      { name: "Seated Hamstring Curl", sets: 3, reps: "12", track: true },
+      { name: "Cable Kickbacks", sets: 3, reps: "15", track: true },
+      { name: "45° Back Extensions", sets: 3, reps: "12", track: true },
+    ],
+  },
+  Tuesday: {
+    title: "Upper Body",
+    warmup: [],
+    exercises: [
+      { name: "Lat Pulldown", sets: 3, reps: "10", track: true },
+      { name: "Seated Row", sets: 3, reps: "10", track: true },
+      { name: "Shoulder Press", sets: 3, reps: "10", track: true },
+      { name: "Chest Press", sets: 3, reps: "10", track: true },
+      { name: "Lateral Raises", sets: 3, reps: "12", track: true },
+      { name: "Biceps Curl", sets: 3, reps: "12", track: true },
+      { name: "Triceps Pushdown", sets: 3, reps: "12", track: true },
+    ],
+  },
+  Thursday: {
+    title: "Glutes & Quads",
+    warmup: ["Monster Walks – 2x15", "Glute Bridges – 2x15"],
+    exercises: [
+      { name: "Hip Thrust Machine", sets: 4, reps: "12", track: true },
+      { name: "Single Leg Hip Thrust", sets: 3, reps: "12 each leg", track: true },
+      { name: "Smith Machine Squat", sets: 4, reps: "8-10", track: true },
+      { name: "Leg Press", sets: 3, reps: "12", track: true },
+      { name: "Walking Lunges", sets: 3, reps: "12 each leg", track: true },
+      { name: "Cable Abduction", sets: 3, reps: "20", track: true },
+      { name: "Leg Extension", sets: 3, reps: "15", track: true },
+    ],
+  },
+  Friday: {
+    title: "Upper Body",
+    warmup: [],
+    exercises: [
+      { name: "Assisted Pull Ups", sets: 3, reps: "10", track: true },
+      { name: "Single Arm Row", sets: 3, reps: "10 each arm", track: true },
+      { name: "Face Pull", sets: 3, reps: "15", track: true },
+      { name: "Incline Dumbbell Press", sets: 3, reps: "10", track: true },
+      { name: "Shoulder Press (DB)", sets: 3, reps: "10", track: true },
+      { name: "Core Circuit", sets: 3, reps: "15", track: false },
+    ],
+  },
+  Saturday: {
+    title: "Glute Pump Day",
+    warmup: [],
+    exercises: [
+      { name: "Hip Thrust (Circuit, x4)", sets: 4, reps: "15", track: true },
+      { name: "Banded Abductions (x4)", sets: 4, reps: "30", track: false },
+      { name: "Cable Kickbacks (Circuit, x3)", sets: 3, reps: "15 each leg", track: true },
+      { name: "Cable Abduction (Circuit, x3)", sets: 3, reps: "15 each leg", track: true },
+      { name: "Frog Pumps (Circuit, x3)", sets: 3, reps: "30", track: false },
+      { name: "Dumbbell RDL (Circuit, x3)", sets: 3, reps: "15", track: true },
+    ],
+  },
+};
+
+const QUOTES = {
+  1: "Strong glutes, strong life. Week 1 is about laying the foundation.",
+  2: "Progress, not perfection. Just show up today.",
+  3: "Every rep builds the body you're working for.",
+  4: "Consistency beats intensity. Keep stacking days.",
+  5: "You are stronger than you were four weeks ago.",
+  6: "Halfway there. Trust the process.",
+  7: "Growth happens when you push past comfortable.",
+  8: "Small weekly wins add up to big transformations.",
+  9: "Your only competition is who you were last week.",
+  10: "Discipline is choosing what you want most.",
+  11: "Almost there. Finish this week strong.",
+  12: "12 weeks of work. A lifetime of strength. Well done.",
+};
+
+/* ============================= STATE ============================= */
+const STORAGE_KEY = "glute-gains-simple-v1";
+
+function defaultState() {
+  return {
+    name: "",
+    currentWeek: 1,
+    goals: { weightKg: null, goalWeightKg: null, hipThrustKg: null, goalHipThrustKg: null, proteinTarget: 130, waterTarget: 2.5 },
+    program: JSON.parse(JSON.stringify(DEFAULT_PROGRAM)), // user-editable copy of the program
+    logs: {},          // key "week-day" -> { exercises: { exerciseKey: { sets:[{weight,reps,completed}] } }, dayCompleted }
+    measurements: [],  // { date, weight, waist, hips }
+    nutrition: {},      // date -> { calories, protein, water }
+    openDay: null,
+  };
+}
+
+function exerciseKey(name) {
+  return (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "exercise";
+}
+
+let state = load();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultState();
+    const parsed = JSON.parse(raw);
+    return Object.assign(defaultState(), parsed);
+  } catch (e) {
+    return defaultState();
+  }
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function dayKey(week, day) { return week + "-" + day; }
+
+function getDayLog(week, day) {
+  const key = dayKey(week, day);
+  const template = state.program[day];
+  if (!state.logs[key]) state.logs[key] = { exercises: {}, dayCompleted: false };
+  const log = state.logs[key];
+  // Reconcile against the current (possibly just-edited) program so renamed/added/resized
+  // exercises always have a matching log entry, without ever destroying existing data.
+  template.exercises.forEach(ex => {
+    const k = exerciseKey(ex.name);
+    if (!log.exercises[k]) {
+      log.exercises[k] = { sets: Array.from({ length: ex.sets }, () => ({ weight: null, reps: null, completed: false })) };
+    } else {
+      while (log.exercises[k].sets.length < ex.sets) log.exercises[k].sets.push({ weight: null, reps: null, completed: false });
+    }
+  });
+  return log;
+}
+
+function completedExerciseCount(week, day) {
+  const log = getDayLog(week, day);
+  const template = state.program[day];
+  return template.exercises.filter(ex => {
+    const loggedEx = log.exercises[exerciseKey(ex.name)];
+    return loggedEx && loggedEx.sets.every(s => s.completed);
+  }).length;
+}
+
+function isDayFullyLogged(week, day) {
+  const log = getDayLog(week, day);
+  const template = state.program[day];
+  return template.exercises.every(ex => {
+    const loggedEx = log.exercises[exerciseKey(ex.name)];
+    return loggedEx && loggedEx.sets.every(s => s.completed);
+  });
+}
+
+function todayISO() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+function todayDayName() {
+  return ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date().getDay()];
+}
+
+function bestWeightForExercise(exerciseName) {
+  let best = null;
+  const k = exerciseKey(exerciseName);
+  Object.values(state.logs).forEach(log => {
+    const loggedEx = log.exercises[k];
+    if (!loggedEx) return;
+    loggedEx.sets.forEach(s => {
+      if (s.completed && s.weight != null && (best === null || s.weight > best)) best = s.weight;
+    });
+  });
+  return best;
+}
+
+function exerciseHistory(exerciseName) {
+  const points = [];
+  const k = exerciseKey(exerciseName);
+  for (let week = 1; week <= 12; week++) {
+    let maxW = null;
+    PROGRAM_DAYS.forEach(day => {
+      const key = dayKey(week, day);
+      const log = state.logs[key];
+      if (!log) return;
+      const loggedEx = log.exercises[k];
+      if (!loggedEx) return;
+      loggedEx.sets.forEach(s => {
+        if (s.completed && s.weight != null) maxW = maxW === null ? s.weight : Math.max(maxW, s.weight);
+      });
+    });
+    if (maxW !== null) points.push({ x: "W" + week, y: maxW });
+  }
+  return points;
+}
+
+function currentStreak() {
+  const completedDates = new Set();
+  Object.entries(state.logs).forEach(([key, log]) => {
+    if (log.dayCompleted && log.completedDate) completedDates.add(log.completedDate);
+  });
+  const dates = Array.from(completedDates).sort().reverse();
+  if (!dates.length) return 0;
+  let streak = 0;
+  let cursor = new Date();
+  for (let i = 0; i < 400; i++) {
+    const iso = cursor.getFullYear() + "-" + String(cursor.getMonth()+1).padStart(2,"0") + "-" + String(cursor.getDate()).padStart(2,"0");
+    if (dates.includes(iso)) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    } else if (streak === 0) {
+      cursor.setDate(cursor.getDate() - 1);
+      if (i > 0) break;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+function totalWorkoutsCompleted() {
+  return Object.values(state.logs).filter(l => l.dayCompleted).length;
+}
+
+/* ============================= RENDER HELPERS ============================= */
+function escapeHtml(s) { return (s ?? "").toString().replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1600);
+}
+
+function ring(progress, size, label, sublabel) {
+  const r = (size - 10) / 2;
+  const c = 2 * Math.PI * r;
+  const off = c * (1 - Math.max(0, Math.min(1, progress)));
+  return `
+  <div class="ring-wrap" style="width:${size}px;height:${size}px;">
+    <svg width="${size}" height="${size}">
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="#FBD9E6" stroke-width="9" fill="none"/>
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="#E8698F" stroke-width="9" fill="none"
+        stroke-dasharray="${c} ${c}" stroke-dashoffset="${off}" stroke-linecap="round"
+        transform="rotate(-90 ${size/2} ${size/2})"/>
+    </svg>
+    <div class="ring-label"><b>${label}</b>${sublabel ? `<span>${sublabel}</span>` : ""}</div>
+  </div>`;
+}
+
+/* ============================= TABS ============================= */
+let activeTab = "home";
+let editMode = false;
+
+function setTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  render();
+  document.getElementById("content").scrollTop = 0;
+}
+
+function render() {
+  const content = document.getElementById("content");
+  if (activeTab === "home") content.innerHTML = renderHome();
+  else if (activeTab === "workout") content.innerHTML = renderWorkout();
+  else if (activeTab === "progress") content.innerHTML = renderProgress();
+  else if (activeTab === "nutrition") content.innerHTML = renderNutrition();
+  else if (activeTab === "profile") content.innerHTML = renderProfile();
+  attachHandlers();
+  if (activeTab === "progress") drawAllCharts();
+}
+
+/* ============================= HOME ============================= */
+function renderHome() {
+  const week = state.currentWeek;
+  const today = todayDayName();
+  const isTrainingDay = PROGRAM_DAYS.includes(today);
+  const template = isTrainingDay ? state.program[today] : null;
+  const totalExInWeek = PROGRAM_DAYS.reduce((a, d) => a + state.program[d].exercises.length, 0);
+  const doneExInWeek = PROGRAM_DAYS.reduce((a, d) => a + completedExerciseCount(week, d), 0);
+  const weekProgress = totalExInWeek ? doneExInWeek / totalExInWeek : 0;
+  const streak = currentStreak();
+  const totalWorkouts = totalWorkoutsCompleted();
+  const nut = state.nutrition[todayISO()] || {};
+  const greetName = state.name ? state.name : "there";
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
+  return `
+    <p class="page-sub" style="margin-bottom:0;">${greeting},</p>
+    <h1 class="page-title">${escapeHtml(greetName)} 🍑</h1>
+
+    <div class="card row" style="align-items:center;">
+      ${ring(weekProgress, 88, "Week " + week)}
+      <div style="flex:1;margin-left:14px;">
+        <div class="badge">Today's Workout</div>
+        <div style="font-size:19px;font-weight:800;margin:4px 0 2px 0;">${template ? template.title : "Rest Day"}</div>
+        <div style="font-size:12px;color:var(--ink-muted);margin-bottom:10px;">${template ? template.exercises.length + " exercises · " + today : "Recovery is part of the plan"}</div>
+        ${template ? `<button class="btn small" data-action="go-today">Start Workout</button>` : ""}
+      </div>
+    </div>
+
+    <div class="grid2" style="margin-bottom:10px;">
+      <div class="stat-pill"><div class="label">🔥 Streak</div><div class="value">${streak} day${streak===1?"":"s"}</div></div>
+      <div class="stat-pill"><div class="label">🏋️ Workouts</div><div class="value">${totalWorkouts}</div></div>
+    </div>
+    <div class="grid3" style="margin-bottom:16px;">
+      <div class="stat-pill"><div class="label">Calories</div><div class="value" style="font-size:16px;">${nut.calories ?? "—"}</div></div>
+      <div class="stat-pill"><div class="label">Protein</div><div class="value" style="font-size:16px;">${nut.protein ? nut.protein+"g" : "—"}</div></div>
+      <div class="stat-pill"><div class="label">Water</div><div class="value" style="font-size:16px;">${nut.water ? nut.water+"L" : "—"}</div></div>
+    </div>
+
+    <div class="quote-card">✨ ${QUOTES[week] || QUOTES[1]}</div>
+  `;
+}
+
+/* ============================= WORKOUT ============================= */
+function renderWorkout() {
+  const week = state.currentWeek;
+  let weekChips = "";
+  for (let w = 1; w <= 12; w++) {
+    weekChips += `<div class="week-chip ${w === week ? "active" : ""}" data-action="set-week" data-week="${w}">${w}</div>`;
+  }
+
+  let dayCards = "";
+  PROGRAM_DAYS.forEach(day => {
+    const template = state.program[day];
+    const log = getDayLog(week, day);
+    const done = isDayFullyLogged(week, day);
+    const isOpen = editMode || state.openDay === day;
+    const doneCount = completedExerciseCount(week, day);
+
+    let bodyHtml = "";
+
+    if (editMode) {
+      const warmupText = template.warmup.join("\n");
+      let exRows = "";
+      template.exercises.forEach((ex, idx) => {
+        exRows += `
+          <div class="edit-ex-row" style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px;">
+            <input type="text" value="${escapeHtml(ex.name)}" data-action="edit-ex-name" data-day="${day}" data-idx="${idx}" placeholder="Exercise name" style="margin-bottom:6px;font-weight:700;"/>
+            <div class="row" style="gap:6px;margin-bottom:6px;">
+              <input type="number" inputmode="numeric" value="${ex.sets}" data-action="edit-ex-sets" data-day="${day}" data-idx="${idx}" style="width:60px;" placeholder="Sets"/>
+              <input type="text" value="${escapeHtml(ex.reps)}" data-action="edit-ex-reps" data-day="${day}" data-idx="${idx}" style="flex:1;" placeholder="Reps e.g. 8-10"/>
+              <button class="btn ghost small" data-action="delete-ex" data-day="${day}" data-idx="${idx}" title="Delete exercise">🗑</button>
+            </div>
+            <label style="font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" ${ex.track ? "checked" : ""} data-action="edit-ex-track" data-day="${day}" data-idx="${idx}" style="width:auto;"/>
+              Track weight for this exercise
+            </label>
+          </div>`;
+      });
+
+      bodyHtml = `
+        <div style="margin-top:14px;">
+          <div style="font-size:11px;font-weight:700;color:var(--ink-muted);margin-bottom:4px;">DAY TITLE</div>
+          <input type="text" value="${escapeHtml(template.title)}" data-action="edit-day-title" data-day="${day}" style="margin-bottom:12px;"/>
+          <div style="font-size:11px;font-weight:700;color:var(--ink-muted);margin-bottom:4px;">WARM UP (one per line)</div>
+          <textarea data-action="edit-warmup" data-day="${day}" rows="3" style="margin-bottom:6px;">${escapeHtml(warmupText)}</textarea>
+          <div style="font-size:11px;font-weight:700;color:var(--ink-muted);margin:10px 0 2px 0;">EXERCISES</div>
+          ${exRows}
+          <button class="btn secondary small" style="margin-top:12px;" data-action="add-ex" data-day="${day}">+ Add Exercise</button>
+        </div>`;
+    } else {
+      let exercisesHtml = "";
+      template.exercises.forEach(ex => {
+        const k = exerciseKey(ex.name);
+        const loggedEx = log.exercises[k];
+        let setsHtml = "";
+        loggedEx.sets.forEach((s, si) => {
+          setsHtml += `
+            <div class="set-row">
+              <span class="setnum">${si + 1}</span>
+              <input type="number" inputmode="decimal" placeholder="kg" value="${s.weight ?? ""}"
+                data-action="set-weight" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}" style="flex:1;" ${ex.track ? "" : "disabled"}/>
+              <input type="number" inputmode="numeric" placeholder="${escapeHtml(ex.reps)}" value="${s.reps ?? ""}"
+                data-action="set-reps" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}" style="flex:1;"/>
+              <button class="check-btn ${s.completed ? "done" : ""}" data-action="toggle-set" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}">✓</button>
+            </div>`;
+        });
+        exercisesHtml += `
+          <div class="exercise-row">
+            <div class="exercise-title">${escapeHtml(ex.name)}</div>
+            <div class="exercise-target">Target: ${ex.sets} x ${escapeHtml(ex.reps)}</div>
+            ${setsHtml}
+          </div>`;
+      });
+
+      const warmupHtml = template.warmup.length
+        ? `<div style="margin:10px 0 4px 0;">${template.warmup.map(w => `<span class="tag">${escapeHtml(w)}</span>`).join("")}</div>`
+        : "";
+
+      bodyHtml = warmupHtml + exercisesHtml + `
+        <button class="btn secondary" style="margin-top:14px;" data-action="finish-day" data-week="${week}" data-day="${day}">Mark Day Complete</button>
+      `;
+    }
+
+    dayCards += `
+      <div class="card day-card">
+        <div class="day-header" data-action="${editMode ? "" : "toggle-day"}" data-day="${day}">
+          <div class="row">
+            <div class="day-icon ${done ? "done" : ""}">${editMode ? "✏️" : (done ? "✅" : "💪")}</div>
+            <div>
+              <div style="font-size:11px;color:var(--ink-muted);font-weight:700;letter-spacing:.3px;">${day.toUpperCase()}</div>
+              <div style="font-size:16px;font-weight:800;">${template.title}</div>
+              <div style="font-size:12px;color:var(--ink-muted);">${editMode ? "Editing this day" : doneCount + "/" + template.exercises.length + " exercises logged"}</div>
+            </div>
+          </div>
+          ${editMode ? "" : `<div style="font-size:18px;color:var(--ink-muted);">${isOpen ? "▲" : "▼"}</div>`}
+        </div>
+        ${isOpen ? bodyHtml : ""}
+      </div>`;
+  });
+
+  return `
+    <div class="row between" style="align-items:flex-start;margin-bottom:2px;">
+      <div>
+        <h1 class="page-title" style="margin-bottom:0;">Workouts</h1>
+        <p class="page-sub">Your 12-week program</p>
+      </div>
+      <button class="btn ${editMode ? "secondary" : "outline"} small" data-action="toggle-edit-mode">${editMode ? "✓ Done" : "✏️ Edit"}</button>
+    </div>
+    ${editMode ? `<div class="empty-hint" style="margin:-6px 0 14px 0;">Editing applies across all 12 weeks. Renaming or deleting an exercise starts fresh tracking for it.</div>` : ""}
+    <div class="week-strip">${weekChips}</div>
+    ${dayCards}
+  `;
+}
+
+/* ============================= PROGRESS ============================= */
+function renderProgress() {
+  const hipThrust = exerciseHistory("Barbell Hip Thrust");
+  const measurements = state.measurements;
+  const weightData = measurements.filter(m => m.weight != null).map(m => ({ x: m.date.slice(5), y: m.weight }));
+  const hipsData = measurements.filter(m => m.hips != null).map(m => ({ x: m.date.slice(5), y: m.hips }));
+  const totalSets = Object.values(state.logs).reduce((a, l) => a + Object.values(l.exercises).reduce((b, ex) => b + ex.sets.filter(s => s.completed).length, 0), 0);
+
+  return `
+    <h1 class="page-title">Progress</h1>
+    <p class="page-sub">Your transformation, visualised</p>
+
+    <div class="card">
+      <h3 class="section-title">Hip Thrust (kg)</h3>
+      ${hipThrust.length >= 2 ? `<canvas id="chart-hipthrust"></canvas>` : `<div class="empty-hint">Log a couple of weeks to see your trend here.</div>`}
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">Body Weight (kg)</h3>
+      ${weightData.length >= 2 ? `<canvas id="chart-weight"></canvas>` : `<div class="empty-hint">Add a couple of measurements below to see your trend.</div>`}
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">Hip Measurement (cm)</h3>
+      ${hipsData.length >= 2 ? `<canvas id="chart-hips"></canvas>` : `<div class="empty-hint">Add a couple of measurements below to see your trend.</div>`}
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">Add Measurement</h3>
+      <div class="grid3" style="margin-bottom:10px;">
+        <input id="m-weight" type="number" inputmode="decimal" placeholder="Weight kg" />
+        <input id="m-waist" type="number" inputmode="decimal" placeholder="Waist cm" />
+        <input id="m-hips" type="number" inputmode="decimal" placeholder="Hips cm" />
+      </div>
+      <button class="btn" data-action="add-measurement">Save Measurement</button>
+      ${measurements.length ? `<div style="margin-top:14px;">` + measurements.slice().reverse().slice(0,5).map(m => `
+        <div class="row between" style="padding:6px 0;border-top:1px solid var(--border);font-size:13px;">
+          <span style="color:var(--ink-muted);">${m.date}</span>
+          <span>${m.weight ?? "—"}kg · Waist ${m.waist ?? "—"}cm · Hips ${m.hips ?? "—"}cm</span>
+        </div>`).join("") + `</div>` : ""}
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">Consistency</h3>
+      <div class="grid2">
+        <div class="stat-pill"><div class="label">Workouts Done</div><div class="value">${totalWorkoutsCompleted()}</div></div>
+        <div class="stat-pill"><div class="label">Total Sets</div><div class="value">${totalSets}</div></div>
+      </div>
+    </div>
+  `;
+}
+
+function drawAllCharts() {
+  drawLineChart("chart-hipthrust", exerciseHistory("Barbell Hip Thrust"));
+  const weightData = state.measurements.filter(m => m.weight != null).map(m => ({ x: m.date.slice(5), y: m.weight }));
+  const hipsData = state.measurements.filter(m => m.hips != null).map(m => ({ x: m.date.slice(5), y: m.hips }));
+  drawLineChart("chart-weight", weightData);
+  drawLineChart("chart-hips", hipsData);
+}
+
+function drawLineChart(canvasId, points) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || points.length < 2) return;
+  const dpr = window.devicePixelRatio || 1;
+  const cssWidth = canvas.clientWidth || 300;
+  const cssHeight = 140;
+  canvas.width = cssWidth * dpr;
+  canvas.height = cssHeight * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+  const padL = 34, padR = 10, padT = 12, padB = 22;
+  const w = cssWidth - padL - padR, h = cssHeight - padT - padB;
+  const ys = points.map(p => p.y);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const yRange = maxY - minY || 1;
+
+  ctx.strokeStyle = "#F3DDE6";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 3; i++) {
+    const y = padT + (h / 3) * i;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + w, y); ctx.stroke();
+  }
+  ctx.fillStyle = "#9A939C"; ctx.font = "10px -apple-system, sans-serif";
+  ctx.fillText(maxY.toFixed(0), 2, padT + 4);
+  ctx.fillText(minY.toFixed(0), 2, padT + h);
+
+  const stepX = points.length > 1 ? w / (points.length - 1) : 0;
+  const coords = points.map((p, i) => ({
+    x: padL + stepX * i,
+    y: padT + h - ((p.y - minY) / yRange) * h,
+  }));
+
+  ctx.strokeStyle = "#E8698F";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  coords.forEach((c, i) => (i === 0 ? ctx.moveTo(c.x, c.y) : ctx.lineTo(c.x, c.y)));
+  ctx.stroke();
+
+  ctx.fillStyle = "#AE375C";
+  coords.forEach(c => { ctx.beginPath(); ctx.arc(c.x, c.y, 3.5, 0, Math.PI * 2); ctx.fill(); });
+
+  ctx.fillStyle = "#9A939C"; ctx.font = "10px -apple-system, sans-serif"; ctx.textAlign = "center";
+  points.forEach((p, i) => ctx.fillText(p.x, coords[i].x, cssHeight - 4));
+  ctx.textAlign = "left";
+}
+
+/* ============================= NUTRITION ============================= */
+function renderNutrition() {
+  const today = todayISO();
+  const entry = state.nutrition[today] || {};
+  const targets = state.goals;
+  const last7 = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const iso = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+    if (state.nutrition[iso]) last7.push({ date: iso, ...state.nutrition[iso] });
+  }
+  const avg = (key) => {
+    const vals = last7.map(e => e[key]).filter(v => typeof v === "number");
+    if (!vals.length) return null;
+    return Math.round((vals.reduce((a,b)=>a+b,0) / vals.length) * 10) / 10;
+  };
+  const proteinPct = targets.proteinTarget && entry.protein ? Math.min(100, Math.round((entry.protein/targets.proteinTarget)*100)) : 0;
+  const waterPct = targets.waterTarget && entry.water ? Math.min(100, Math.round((entry.water/targets.waterTarget)*100)) : 0;
+
+  return `
+    <h1 class="page-title">Nutrition</h1>
+    <p class="page-sub">${today}</p>
+
+    <div class="card">
+      <h3 class="section-title">Today</h3>
+      <div class="row between" style="margin-bottom:8px;">
+        <span style="font-size:14px;">Calories</span>
+        <input type="number" inputmode="numeric" style="width:90px;" value="${entry.calories ?? ""}" data-action="set-nutrition" data-field="calories" placeholder="kcal"/>
+      </div>
+      <div class="row between" style="margin-bottom:6px;">
+        <span style="font-size:14px;">Protein (target ${targets.proteinTarget}g)</span>
+        <input type="number" inputmode="numeric" style="width:90px;" value="${entry.protein ?? ""}" data-action="set-nutrition" data-field="protein" placeholder="g"/>
+      </div>
+      <div class="progress-track" style="margin-bottom:14px;"><div class="progress-fill" style="width:${proteinPct}%;"></div></div>
+      <div class="row between" style="margin-bottom:6px;">
+        <span style="font-size:14px;">Water (target ${targets.waterTarget}L)</span>
+        <input type="number" inputmode="decimal" style="width:90px;" value="${entry.water ?? ""}" data-action="set-nutrition" data-field="water" placeholder="L"/>
+      </div>
+      <div class="progress-track"><div class="progress-fill" style="width:${waterPct}%;"></div></div>
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">7-Day Averages</h3>
+      <div class="grid3">
+        <div class="stat-pill"><div class="label">Calories</div><div class="value" style="font-size:16px;">${avg("calories") ?? "—"}</div></div>
+        <div class="stat-pill"><div class="label">Protein</div><div class="value" style="font-size:16px;">${avg("protein") ?? "—"}</div></div>
+        <div class="stat-pill"><div class="label">Water</div><div class="value" style="font-size:16px;">${avg("water") ?? "—"}</div></div>
+      </div>
+    </div>
+  `;
+}
+
+/* ============================= PROFILE ============================= */
+function renderProfile() {
+  const g = state.goals;
+  const bestHipThrust = bestWeightForExercise("Barbell Hip Thrust");
+  return `
+    <h1 class="page-title">Profile</h1>
+    <p class="page-sub">Goals & settings</p>
+
+    <div class="card">
+      <h3 class="section-title">Your Name</h3>
+      <input id="p-name" type="text" placeholder="Your name" value="${escapeHtml(state.name)}" data-action="set-name" />
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">Goals</h3>
+      <div class="row between" style="margin-bottom:8px;">
+        <span style="font-size:14px;">Goal Weight (kg)</span>
+        <input type="number" inputmode="decimal" style="width:90px;" value="${g.goalWeightKg ?? ""}" data-action="set-goal" data-field="goalWeightKg"/>
+      </div>
+      <div class="row between" style="margin-bottom:8px;">
+        <span style="font-size:14px;">Goal Hip Thrust (kg)</span>
+        <input type="number" inputmode="decimal" style="width:90px;" value="${g.goalHipThrustKg ?? ""}" data-action="set-goal" data-field="goalHipThrustKg"/>
+      </div>
+      <div class="row between" style="margin-bottom:8px;">
+        <span style="font-size:14px;">Protein Target (g)</span>
+        <input type="number" inputmode="numeric" style="width:90px;" value="${g.proteinTarget ?? ""}" data-action="set-goal" data-field="proteinTarget"/>
+      </div>
+      <div class="row between">
+        <span style="font-size:14px;">Water Target (L)</span>
+        <input type="number" inputmode="decimal" style="width:90px;" value="${g.waterTarget ?? ""}" data-action="set-goal" data-field="waterTarget"/>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">Current Stats</h3>
+      <div class="row between" style="padding:4px 0;"><span style="color:var(--ink-soft);">Current Hip Thrust PR</span><b>${bestHipThrust != null ? bestHipThrust + "kg" : "—"}</b></div>
+      <div class="row between" style="padding:4px 0;"><span style="color:var(--ink-soft);">Workouts Completed</span><b>${totalWorkoutsCompleted()}</b></div>
+      <div class="row between" style="padding:4px 0;"><span style="color:var(--ink-soft);">Current Streak</span><b>${currentStreak()} days</b></div>
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">📲 Add to Home Screen</h3>
+      <div class="install-steps">
+        On iPhone: tap the <b>Share</b> button in Safari → <b>Add to Home Screen</b>.<br/>
+        It'll then open full-screen like a real app, with your data saved right on your phone.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">Program</h3>
+      <p class="empty-hint" style="margin-top:-4px;">Edit exercises anytime from the ✏️ button on the Workouts tab.</p>
+      <button class="btn secondary" style="margin-bottom:10px;" data-action="reset-program">Reset Program to Default</button>
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">Data</h3>
+      <button class="btn outline" data-action="reset-data">Reset All Data</button>
+    </div>
+  `;
+}
+
+/* ============================= EVENT HANDLING ============================= */
+function attachHandlers() {
+  const content = document.getElementById("content");
+
+  content.querySelectorAll("[data-action]").forEach(el => {
+    const action = el.dataset.action;
+
+    if (action === "go-today") {
+      el.onclick = () => {
+        const today = todayDayName();
+        if (PROGRAM_DAYS.includes(today)) {
+          state.openDay = today;
+          save();
+          setTab("workout");
+        }
+      };
+    }
+    if (action === "set-week") {
+      el.onclick = () => { state.currentWeek = Number(el.dataset.week); save(); render(); };
+    }
+    if (action === "toggle-day") {
+      el.onclick = () => {
+        const day = el.dataset.day;
+        state.openDay = state.openDay === day ? null : day;
+        save(); render();
+      };
+    }
+    if (action === "toggle-set") {
+      el.onclick = () => {
+        const { week, day, ex, set } = el.dataset;
+        const log = getDayLog(Number(week), day);
+        const s = log.exercises[ex].sets[set];
+        s.completed = !s.completed;
+        save(); render();
+      };
+    }
+    if (action === "set-weight" || action === "set-reps") {
+      el.oninput = () => {
+        const { week, day, ex, set } = el.dataset;
+        const log = getDayLog(Number(week), day);
+        const s = log.exercises[ex].sets[set];
+        const val = el.value === "" ? null : Number(el.value);
+        if (action === "set-weight") s.weight = val; else s.reps = val;
+        save();
+      };
+    }
+    if (action === "finish-day") {
+      el.onclick = () => {
+        const { week, day } = el.dataset;
+        const log = getDayLog(Number(week), day);
+        log.dayCompleted = true;
+        log.completedDate = todayISO();
+        save();
+        showToast("Workout logged! 🍑");
+        render();
+      };
+    }
+    if (action === "add-measurement") {
+      el.onclick = () => {
+        const weight = document.getElementById("m-weight").value;
+        const waist = document.getElementById("m-waist").value;
+        const hips = document.getElementById("m-hips").value;
+        if (!weight && !waist && !hips) { showToast("Enter at least one value"); return; }
+        state.measurements.push({
+          date: todayISO(),
+          weight: weight ? Number(weight) : null,
+          waist: waist ? Number(waist) : null,
+          hips: hips ? Number(hips) : null,
+        });
+        save();
+        showToast("Measurement saved");
+        render();
+      };
+    }
+    if (action === "set-nutrition") {
+      el.oninput = () => {
+        const field = el.dataset.field;
+        const today = todayISO();
+        if (!state.nutrition[today]) state.nutrition[today] = {};
+        state.nutrition[today][field] = el.value === "" ? null : Number(el.value);
+        save();
+      };
+    }
+    if (action === "set-goal") {
+      el.oninput = () => {
+        state.goals[el.dataset.field] = el.value === "" ? null : Number(el.value);
+        save();
+      };
+    }
+    if (action === "set-name") {
+      el.oninput = () => { state.name = el.value; save(); };
+    }
+    if (action === "toggle-edit-mode") {
+      el.onclick = () => { editMode = !editMode; render(); };
+    }
+    if (action === "edit-day-title") {
+      el.oninput = () => { state.program[el.dataset.day].title = el.value; save(); };
+    }
+    if (action === "edit-warmup") {
+      el.oninput = () => {
+        state.program[el.dataset.day].warmup = el.value.split("\n").map(s => s.trim()).filter(Boolean);
+        save();
+      };
+    }
+    if (action === "edit-ex-name") {
+      el.oninput = () => { state.program[el.dataset.day].exercises[Number(el.dataset.idx)].name = el.value; save(); };
+    }
+    if (action === "edit-ex-sets") {
+      el.oninput = () => {
+        const v = Math.max(1, Number(el.value) || 1);
+        state.program[el.dataset.day].exercises[Number(el.dataset.idx)].sets = v;
+        save();
+      };
+    }
+    if (action === "edit-ex-reps") {
+      el.oninput = () => { state.program[el.dataset.day].exercises[Number(el.dataset.idx)].reps = el.value; save(); };
+    }
+    if (action === "edit-ex-track") {
+      el.onchange = () => { state.program[el.dataset.day].exercises[Number(el.dataset.idx)].track = el.checked; save(); };
+    }
+    if (action === "delete-ex") {
+      el.onclick = () => {
+        const day = el.dataset.day, idx = Number(el.dataset.idx);
+        if (state.program[day].exercises.length <= 1) { showToast("A day needs at least one exercise"); return; }
+        if (confirm("Delete this exercise? This applies to all 12 weeks.")) {
+          state.program[day].exercises.splice(idx, 1);
+          save(); render();
+        }
+      };
+    }
+    if (action === "add-ex") {
+      el.onclick = () => {
+        state.program[el.dataset.day].exercises.push({ name: "New Exercise", sets: 3, reps: "10", track: true });
+        save(); render();
+        showToast("Exercise added");
+      };
+    }
+    if (action === "reset-program") {
+      el.onclick = () => {
+        if (confirm("Reset the workout program back to the original 12-week plan? Your logged history, measurements and nutrition stay untouched.")) {
+          state.program = JSON.parse(JSON.stringify(DEFAULT_PROGRAM));
+          save(); render();
+          showToast("Program reset to default");
+        }
+      };
+    }
+    if (action === "reset-data") {
+      el.onclick = () => {
+        if (confirm("This will erase all your logged workouts, measurements and nutrition. Are you sure?")) {
+          localStorage.removeItem(STORAGE_KEY);
+          state = defaultState();
+          render();
+          showToast("Data reset");
+        }
+      };
+    }
+  });
+}
+
+/* ============================= BOOT ============================= */
+document.querySelectorAll("#tabbar .tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => setTab(btn.dataset.tab));
+});
+setTab("home");
+
+/* Service worker: makes the app work offline once installed */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
