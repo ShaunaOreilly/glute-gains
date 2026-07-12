@@ -46,6 +46,11 @@
     margin: 0 auto;
   }
   h1.page-title { font-size: 30px; font-weight: 800; margin: 4px 0 4px 0; letter-spacing: -0.4px; }
+  .brand {
+    text-align: center; font-size: 13px; font-weight: 800; letter-spacing: 2.5px;
+    text-transform: uppercase; color: var(--pink-dark); margin: 2px 0 16px 0;
+  }
+  .brand span { letter-spacing: normal; }
   p.page-sub { color: var(--ink-soft); font-size: 16px; margin: 0 0 20px 0; }
   .card {
     background: var(--card);
@@ -643,11 +648,12 @@ function render() {
     return;
   }
   document.getElementById("tabbar").style.display = "flex";
-  if (activeTab === "home") content.innerHTML = renderHome();
-  else if (activeTab === "workout") content.innerHTML = renderWorkout();
-  else if (activeTab === "progress") content.innerHTML = renderProgress();
-  else if (activeTab === "nutrition") content.innerHTML = renderNutrition();
-  else if (activeTab === "profile") content.innerHTML = renderProfile();
+  const brand = `<div class="brand">Shauna's Sculpt <span>🍑</span></div>`;
+  if (activeTab === "home") content.innerHTML = brand + renderHome();
+  else if (activeTab === "workout") content.innerHTML = brand + renderWorkout();
+  else if (activeTab === "progress") content.innerHTML = brand + renderProgress();
+  else if (activeTab === "nutrition") content.innerHTML = brand + renderNutrition();
+  else if (activeTab === "profile") content.innerHTML = brand + renderProfile();
   attachHandlers();
   if (activeTab === "progress") drawAllCharts();
 }
