@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-<title>Glute Gains</title>
+<title>Shauna's Sculpt</title>
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="theme-color" content="#FFF5F8" />
-<meta name="apple-mobile-web-app-title" content="Glute Gains" />
+<meta name="apple-mobile-web-app-title" content="Shauna's Sculpt" />
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
@@ -1266,7 +1266,7 @@ function renderOnboarding() {
     <div style="max-width:480px;margin:0 auto;padding-top:16px;">
       <div style="text-align:center;margin-bottom:20px;">
         <div style="font-size:52px;">🍑</div>
-        <h1 class="page-title" style="margin-bottom:4px;">Welcome to Glute Gains</h1>
+        <h1 class="page-title" style="margin-bottom:4px;">Welcome to Shauna's Sculpt</h1>
         <p class="page-sub" style="margin-bottom:0;">30 seconds of setup, then it's all about you.</p>
       </div>
 
@@ -1496,7 +1496,7 @@ function attachHandlers() {
         const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "glute-gains-backup-" + todayISO() + ".json";
+        a.download = "shaunas-sculpt-backup-" + todayISO() + ".json";
         document.body.appendChild(a);
         a.click();
         setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
@@ -1568,7 +1568,7 @@ function attachHandlers() {
           save(); render();
           showToast("Backup restored ✅");
         } catch (e) {
-          showToast("That file doesn't look like a Glute Gains backup");
+          showToast("That file doesn't look like a Shauna's Sculpt backup");
         }
       };
       reader.readAsText(f);
