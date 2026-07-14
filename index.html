@@ -56,11 +56,11 @@
   p.page-sub { color: var(--ink-soft); font-size: 16px; margin: 0 0 20px 0; }
   .card {
     background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 20px;
+    border: none;
+    border-radius: 18px;
     padding: 18px;
-    margin-bottom: 16px;
-    box-shadow: 0 4px 14px rgba(174, 55, 92, 0.08);
+    margin-bottom: 14px;
+    box-shadow: 0 1px 3px rgba(174, 55, 92, 0.07), 0 6px 18px rgba(174, 55, 92, 0.05);
   }
   .hero-card {
     background: linear-gradient(135deg, #FFEDF4, #FBD9E6);
@@ -73,9 +73,10 @@
   .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
   .stat-pill {
     background: var(--card);
-    border: 1px solid var(--border);
+    border: none;
     border-radius: 14px;
-    padding: 10px 12px;
+    padding: 11px 13px;
+    box-shadow: 0 1px 3px rgba(174, 55, 92, 0.06);
   }
   .stat-pill .label { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; color: var(--ink-muted); text-transform: uppercase; }
   .stat-pill .value { font-size: 22px; font-weight: 800; margin-top: 2px; }
@@ -104,15 +105,17 @@
   .ring-label b { font-size: 16px; }
   .ring-label span { font-size: 10px; color: var(--ink-muted); }
   input, textarea {
-    font-family: inherit; background: var(--pink-bg); border: 1px solid var(--border);
-    border-radius: 12px; padding: 12px; font-size: 16px; color: var(--ink); width: 100%;
+    font-family: inherit; background: var(--pink-bg); border: none;
+    border-radius: 12px; padding: 13px; font-size: 16px; color: var(--ink); width: 100%;
+    -webkit-appearance: none; appearance: none;
   }
-  input:focus, textarea:focus { outline: 2px solid var(--pink-soft); border-color: var(--pink); }
+  input:focus, textarea:focus { outline: 2px solid var(--pink); outline-offset: -1px; }
   .week-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 16px; }
   .week-chip {
     flex-shrink: 0; width: 50px; height: 50px; border-radius: 25px; display: flex;
     align-items: center; justify-content: center; font-weight: 700; font-size: 16px;
-    background: var(--card); border: 1px solid var(--border); color: var(--ink); cursor: pointer;
+    background: var(--card); border: none; box-shadow: 0 1px 3px rgba(174, 55, 92, 0.08);
+    color: var(--ink); cursor: pointer;
   }
   .week-chip.active { background: var(--pink); color: #fff; border-color: var(--pink); }
   .day-card { margin-bottom: 12px; }
@@ -206,9 +209,11 @@
 
   /* Page transitions + touch feel */
   @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-  #content > * { animation: fadeUp .28s ease both; }
-  .btn:active, .check-btn:active, .week-chip:active { transform: scale(0.96); }
-  .btn, .check-btn, .week-chip { transition: transform .12s ease; }
+  #content > * { animation: fadeUp .28s cubic-bezier(.2,.8,.3,1) both; }
+  .btn:active, .check-btn:active, .week-chip:active { transform: scale(0.96); opacity: 0.75; }
+  .tab-btn:active { opacity: 0.55; }
+  .btn, .check-btn, .week-chip, .tab-btn { transition: transform .12s ease, opacity .12s ease; }
+  .card, .day-header { -webkit-tap-highlight-color: transparent; }
 
   /* Welcome splash */
   #splash {
@@ -265,6 +270,8 @@
     </nav>
   </div>
   <div class="toast" id="toast"></div>
+  <input type="checkbox" switch id="haptic-sw" aria-hidden="true" tabindex="-1"
+    style="position:fixed;left:-200px;top:-200px;width:1px;height:1px;opacity:0.01;pointer-events:none;" />
   <div id="rest-timer">
     <span class="rt-label">⏱ Rest</span>
     <b id="rest-time">1:30</b>
@@ -565,6 +572,15 @@ function stopRestTimer() {
   clearInterval(restInterval);
   restInterval = null;
   document.getElementById("rest-timer").classList.remove("show");
+}
+
+/* Haptic tap: navigator.vibrate on Android; iOS uses the hidden switch trick (Safari 17.4+) */
+function haptic() {
+  try {
+    if (navigator.vibrate) { navigator.vibrate(10); return; }
+    const sw = document.getElementById("haptic-sw");
+    if (sw) sw.click();
+  } catch (e) {}
 }
 
 function beep() {
@@ -1825,6 +1841,13 @@ if (state.onboarded) {
 /* Rest timer controls */
 document.getElementById("rest-plus").onclick = () => { restRemaining += 30; updateRestUI(); };
 document.getElementById("rest-skip").onclick = () => stopRestTimer();
+
+/* Haptic feedback on every tap of a button-like control */
+document.addEventListener("click", (e) => {
+  if (!e.isTrusted) return;
+  if (e.target.id === "haptic-sw") return;
+  if (e.target.closest("button, .tab-btn, .week-chip, .check-btn, .day-header, .badge, select, label")) haptic();
+}, true);
 
 /* Service worker: makes the app work offline once installed */
 if ("serviceWorker" in navigator) {
