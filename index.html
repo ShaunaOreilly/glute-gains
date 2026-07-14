@@ -36,6 +36,8 @@
     overscroll-behavior-y: none;
     font-size: 16px;
     line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
   #app { display: flex; flex-direction: column; min-height: 100vh; }
   #content {
@@ -148,8 +150,11 @@
     font-size: 11px; padding: 3px 9px; border-radius: 999px; margin: 0 4px 4px 0;
   }
   #tabbar {
-    position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--border);
-    display: flex; padding: 8px 6px max(8px, env(safe-area-inset-bottom)) 6px; z-index: 10;
+    position: fixed; bottom: 0; left: 0; right: 0; border-top: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.78);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    display: flex; padding: 8px 2px max(8px, env(safe-area-inset-bottom)) 2px; z-index: 10;
   }
   .tab-btn {
     flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none;
@@ -205,6 +210,19 @@
   .btn:active, .check-btn:active, .week-chip:active { transform: scale(0.96); }
   .btn, .check-btn, .week-chip { transition: transform .12s ease; }
 
+  /* Welcome splash */
+  #splash {
+    position: fixed; inset: 0; z-index: 80;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(165deg, var(--pink-bg) 0%, var(--pink-soft) 100%);
+    animation: splash-out .55s ease 1.8s forwards;
+  }
+  .splash-inner { text-align: center; animation: splash-in .7s cubic-bezier(.2,.8,.3,1) both; }
+  .splash-peach { font-size: 68px; margin-bottom: 6px; }
+  .splash-title { font-size: 28px; font-weight: 800; letter-spacing: -0.4px; color: var(--ink); }
+  @keyframes splash-in { from { opacity: 0; transform: translateY(16px) scale(.96); } to { opacity: 1; transform: none; } }
+  @keyframes splash-out { to { opacity: 0; visibility: hidden; } }
+
   /* Onboarding overlay */
   #onboarding {
     position: fixed; inset: 0; z-index: 40; background: var(--pink-bg);
@@ -225,7 +243,7 @@
       --green-bg: #1F3A2C;
       --shadow: 0 6px 20px rgba(0,0,0,0.4);
     }
-    #tabbar { background: #241A20; border-top-color: var(--border); }
+    #tabbar { background: rgba(36, 26, 32, 0.82); border-top-color: var(--border); }
     .card { box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
     .hero-card { background: linear-gradient(135deg, #3A2330, #4A2A38); }
     .quote-card { background: linear-gradient(135deg, #3A2330, #33202B); color: #F3BCD2; }
@@ -242,6 +260,7 @@
       <button class="tab-btn" data-tab="workout"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M7.5 12h9"/><rect x="4" y="7.5" width="3" height="9" rx="1.2"/><rect x="17" y="7.5" width="3" height="9" rx="1.2"/><path d="M2 10v4M22 10v4"/></svg></span>Workout</button>
       <button class="tab-btn" data-tab="progress"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M4 20V4"/><path d="M4 20h16"/><path d="M7 15l4-5 3 3 5-7"/></svg></span>Progress</button>
       <button class="tab-btn" data-tab="nutrition"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M12 21c-4.5 0-7-3.5-7-7 0-3 2-5 4.5-5 1 0 1.8.3 2.5.8.7-.5 1.5-.8 2.5-.8C17 9 19 11 19 14c0 3.5-2.5 7-7 7Z"/><path d="M12 9V6.5C12 5 13 4 14.5 4"/></svg></span>Nutrition</button>
+      <button class="tab-btn" data-tab="period"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M12 3c3.5 4.3 6 7.5 6 10.6a6 6 0 0 1-12 0C6 10.5 8.5 7.3 12 3Z"/></svg></span>Cycle</button>
       <button class="tab-btn" data-tab="profile"><span class="tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c1.2-3.2 4-5 7.5-5s6.3 1.8 7.5 5"/></svg></span>Profile</button>
     </nav>
   </div>
@@ -352,6 +371,7 @@ function defaultState() {
     openDay: null,
     onboarded: false,
     settings: { restSeconds: 90 },
+    period: { entries: [] },   // entries: [{ start: ISO date, end: ISO date | null }]
   };
 }
 
@@ -653,6 +673,7 @@ function render() {
   else if (activeTab === "workout") content.innerHTML = brand + renderWorkout();
   else if (activeTab === "progress") content.innerHTML = brand + renderProgress();
   else if (activeTab === "nutrition") content.innerHTML = brand + renderNutrition();
+  else if (activeTab === "period") content.innerHTML = brand + renderPeriod();
   else if (activeTab === "profile") content.innerHTML = brand + renderProfile();
   attachHandlers();
   if (activeTab === "progress") drawAllCharts();
@@ -935,13 +956,20 @@ function renderDayPage(week, day) {
       setsHtml += `
         <div class="set-row">
           <span class="setnum">${si + 1}</span>
-          <input type="number" inputmode="decimal" placeholder="${wPlaceholder}" value="${s.weight ?? ""}"
-            data-action="set-weight" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}" style="flex:1;" ${ex.track ? "" : "disabled"}/>
           <input type="number" inputmode="numeric" placeholder="${rPlaceholder}" value="${s.reps ?? ""}"
             data-action="set-reps" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}" style="flex:1;"/>
+          <input type="number" inputmode="decimal" placeholder="${wPlaceholder}" value="${s.weight ?? ""}"
+            data-action="set-weight" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}" style="flex:1;" ${ex.track ? "" : "disabled"}/>
           <button class="check-btn ${s.completed ? "done" : ""}" data-action="toggle-set" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}">✓</button>
         </div>`;
     });
+    const setHeader = `
+      <div class="set-row" style="margin-bottom:4px;">
+        <span class="setnum" style="font-size:11px;font-weight:700;">SET</span>
+        <span style="flex:1;text-align:center;font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--ink-muted);">REPS</span>
+        <span style="flex:1;text-align:center;font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--ink-muted);">WEIGHT (KG)</span>
+        <span style="width:42px;"></span>
+      </div>`;
     // Last week's top weight, change so far, and a progression suggestion
     let lastWeekHtml = "";
     if (ex.track) {
@@ -966,6 +994,7 @@ function renderDayPage(week, day) {
         <div class="exercise-title">${escapeHtml(ex.name)}</div>
         <div class="exercise-target">Target: ${ex.sets} x ${escapeHtml(ex.reps)}</div>
         ${lastWeekHtml}
+        ${setHeader}
         ${setsHtml}
       </div>`;
   });
@@ -1304,6 +1333,116 @@ function renderProfile() {
   `;
 }
 
+/* ============================= PERIOD / CYCLE ============================= */
+function cycleInfo() {
+  if (!state.period) state.period = { entries: [] };
+  const entries = state.period.entries;
+  const last = entries.length ? entries[entries.length - 1] : null;
+  const active = !!(last && !last.end);
+  const gaps = [];
+  for (let i = 1; i < entries.length; i++) {
+    const d = Math.round((new Date(entries[i].start) - new Date(entries[i - 1].start)) / 86400000);
+    if (d >= 15 && d <= 60) gaps.push(d);
+  }
+  const avg = gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : 28;
+  let cycleDay = null, nextDate = null, daysUntil = null;
+  if (last) {
+    cycleDay = Math.floor((new Date(todayISO()) - new Date(last.start)) / 86400000) + 1;
+    nextDate = new Date(new Date(last.start).getTime() + avg * 86400000);
+    daysUntil = Math.round((nextDate - new Date(todayISO())) / 86400000);
+  }
+  return { entries, last, active, avg, cycleDay, nextDate, daysUntil };
+}
+
+function niceDate(d) {
+  return d.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+}
+
+function renderPeriod() {
+  const c = cycleInfo();
+  let heroHtml, phaseHtml = "";
+
+  if (!c.last) {
+    heroHtml = `
+      <div class="card hero-card" style="text-align:center;">
+        <div style="font-size:44px;margin-bottom:6px;">🌸</div>
+        <div style="font-size:20px;font-weight:800;margin-bottom:6px;">Track your cycle</div>
+        <div style="font-size:14px;color:var(--ink-soft);margin-bottom:14px;">Log your period and I'll learn your cycle, predict the next one, and match training tips to where you are in the month.</div>
+        <button class="btn" data-action="period-start">My period started today</button>
+      </div>`;
+  } else if (c.active) {
+    const dayOfPeriod = Math.floor((new Date(todayISO()) - new Date(c.last.start)) / 86400000) + 1;
+    heroHtml = `
+      <div class="card hero-card" style="text-align:center;">
+        <div style="font-size:44px;margin-bottom:6px;">🩸</div>
+        <div style="font-size:20px;font-weight:800;margin-bottom:4px;">Day ${dayOfPeriod} of your period</div>
+        <div style="font-size:14px;color:var(--ink-soft);margin-bottom:14px;">Started ${niceDate(new Date(c.last.start))}. Be kind to yourself — lighter sessions still count.</div>
+        <button class="btn" data-action="period-end">My period ended today</button>
+      </div>`;
+  } else {
+    const overdue = c.daysUntil < 0;
+    heroHtml = `
+      <div class="card hero-card" style="text-align:center;">
+        <div style="font-size:44px;margin-bottom:6px;">🌸</div>
+        <div style="font-size:20px;font-weight:800;margin-bottom:4px;">Cycle day ${c.cycleDay}</div>
+        <div style="font-size:15px;color:var(--ink-soft);margin-bottom:14px;">
+          ${overdue
+            ? `Next period was expected ${niceDate(c.nextDate)} — ${Math.abs(c.daysUntil)} day${Math.abs(c.daysUntil) === 1 ? "" : "s"} ago`
+            : `Next period expected <b style="color:var(--pink-dark);">${niceDate(c.nextDate)}</b> — in ${c.daysUntil} day${c.daysUntil === 1 ? "" : "s"}`}
+        </div>
+        <button class="btn" data-action="period-start">My period started today</button>
+      </div>`;
+  }
+
+  if (c.cycleDay != null && !c.active) {
+    const d = ((c.cycleDay - 1) % c.avg) + 1;
+    let phase, emoji, tip;
+    if (d <= 5) { phase = "Menstrual"; emoji = "🌙"; tip = "Energy can be low. Lighter weights or a walk are perfect — showing up is the win."; }
+    else if (d <= 13) { phase = "Follicular"; emoji = "🌱"; tip = "Rising energy — a great window to push heavy lifts and chase PBs."; }
+    else if (d <= 16) { phase = "Ovulation"; emoji = "☀️"; tip = "Strength often peaks now. Go for it, but warm up properly — joints can be looser."; }
+    else { phase = "Luteal"; emoji = "🍂"; tip = "Energy may dip. Keep moving, drop the intensity a touch, and prioritise sleep and protein."; }
+    phaseHtml = `
+      <div class="card">
+        <div class="row between" style="margin-bottom:6px;">
+          <h3 class="section-title" style="margin:0;">${emoji} ${phase} phase</h3>
+          <span style="font-size:13px;color:var(--ink-muted);">day ${d} of ~${c.avg}</span>
+        </div>
+        <div style="font-size:14px;color:var(--ink-soft);">${tip}</div>
+      </div>`;
+  }
+
+  const historyHtml = c.entries.length ? `
+    <div class="card">
+      <div class="row between" style="margin-bottom:6px;">
+        <h3 class="section-title" style="margin:0;">History</h3>
+        <button class="btn ghost small" data-action="period-undo" style="padding:4px 8px;min-height:0;">Undo last</button>
+      </div>
+      ${c.entries.slice(-6).reverse().map(e => {
+        const len = e.end ? Math.floor((new Date(e.end) - new Date(e.start)) / 86400000) + 1 : null;
+        return `<div class="row between" style="padding:8px 0;border-top:1px solid var(--border);font-size:14px;">
+          <span>${niceDate(new Date(e.start))}</span>
+          <span style="color:var(--ink-muted);">${e.end ? len + " day" + (len === 1 ? "" : "s") : "ongoing"}</span>
+        </div>`;
+      }).join("")}
+    </div>` : "";
+
+  const statsHtml = c.entries.length ? `
+    <div class="grid2" style="margin-bottom:16px;">
+      <div class="stat-pill"><div class="label">Avg cycle</div><div class="value" style="font-size:19px;">${c.avg} days</div></div>
+      <div class="stat-pill"><div class="label">Periods logged</div><div class="value" style="font-size:19px;">${c.entries.length}</div></div>
+    </div>` : "";
+
+  return `
+    <h1 class="page-title">Cycle</h1>
+    <p class="page-sub">Your body, your rhythm</p>
+    ${heroHtml}
+    ${phaseHtml}
+    ${statsHtml}
+    ${historyHtml}
+    <div class="empty-hint" style="text-align:center;">🔒 Cycle data stays on your phone only — include it in your backups from Profile. Predictions are estimates, not medical advice.</div>
+  `;
+}
+
 /* ============================= ONBOARDING ============================= */
 function renderOnboarding() {
   const g = state.goals;
@@ -1556,6 +1695,35 @@ function attachHandlers() {
         save();
       };
     }
+    if (action === "period-start") {
+      el.onclick = () => {
+        if (!state.period) state.period = { entries: [] };
+        const last = state.period.entries[state.period.entries.length - 1];
+        if (last && !last.end) { showToast("Your current period is still ongoing"); return; }
+        state.period.entries.push({ start: todayISO(), end: null });
+        save(); render();
+        showToast("Period logged 🌸 Take care of yourself");
+      };
+    }
+    if (action === "period-end") {
+      el.onclick = () => {
+        const last = state.period.entries[state.period.entries.length - 1];
+        if (!last || last.end) return;
+        last.end = todayISO();
+        save(); render();
+        showToast("Logged — I'll predict your next one from this");
+      };
+    }
+    if (action === "period-undo") {
+      el.onclick = () => {
+        if (!state.period.entries.length) return;
+        if (confirm("Remove the most recent period entry?")) {
+          state.period.entries.pop();
+          save(); render();
+          showToast("Entry removed");
+        }
+      };
+    }
     if (action === "finish-onboarding") {
       el.onclick = () => {
         const v = id => { const n = document.getElementById(id); return n && n.value !== "" ? Number(n.value) : null; };
@@ -1640,6 +1808,19 @@ document.querySelectorAll("#tabbar .tab-btn").forEach(btn => {
   });
 });
 setTab("home");
+
+/* Welcome back splash */
+if (state.onboarded) {
+  const sp = document.createElement("div");
+  sp.id = "splash";
+  sp.innerHTML = `<div class="splash-inner">
+    <div class="splash-peach">🍑</div>
+    <div class="splash-title">Welcome Back ${escapeHtml(state.name || "")}</div>
+    <div class="brand" style="margin-top:10px;">Shauna's Sculpt</div>
+  </div>`;
+  document.body.appendChild(sp);
+  setTimeout(() => sp.remove(), 2500);
+}
 
 /* Rest timer controls */
 document.getElementById("rest-plus").onclick = () => { restRemaining += 30; updateRestUI(); };
