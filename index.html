@@ -317,7 +317,6 @@ const DEFAULT_PROGRAM = {
       { name: "Single Leg Hip Thrust", sets: 3, reps: "12 each leg", track: true },
       { name: "Smith Machine Squat", sets: 4, reps: "8-10", track: true },
       { name: "Leg Press", sets: 3, reps: "12", track: true },
-      { name: "Walking Lunges", sets: 3, reps: "12 each leg", track: true },
       { name: "Cable Abduction", sets: 3, reps: "20", track: true },
       { name: "Leg Extension", sets: 3, reps: "15", track: true },
     ],
@@ -395,6 +394,16 @@ function load() {
     const parsed = JSON.parse(raw);
     const merged = Object.assign(defaultState(), parsed);
     if (!merged.name) merged.name = "Shauna";
+    // One-time program updates (applied to her saved copy)
+    if (!merged.migrations) merged.migrations = {};
+    if (!merged.migrations.thuNoLungesLegExt && merged.program && merged.program.Thursday) {
+      const th = merged.program.Thursday;
+      th.exercises = th.exercises.filter(e => !/lunge/i.test(e.name || ""));
+      if (!th.exercises.some(e => /leg\s*extension/i.test(e.name || ""))) {
+        th.exercises.push({ name: "Leg Extension", sets: 3, reps: "15", track: true });
+      }
+      merged.migrations.thuNoLungesLegExt = true;
+    }
     return merged;
   } catch (e) {
     return defaultState();
