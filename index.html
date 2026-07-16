@@ -338,9 +338,9 @@ const DEFAULT_PROGRAM = {
     warmup: [],
     exercises: [
       { name: "Hip Thrust (Circuit, x4)", sets: 4, reps: "15", track: true },
-      { name: "Banded Abductions (x4)", sets: 4, reps: "30", track: false },
+      { name: "Seated Abduction", sets: 3, reps: "15", track: true },
+      { name: "Reverse Lunge (Smith Machine)", sets: 3, reps: "12 each leg", track: true },
       { name: "Cable Kickbacks (Circuit, x3)", sets: 3, reps: "15 each leg", track: true },
-      { name: "Cable Abduction (Circuit, x3)", sets: 3, reps: "15 each leg", track: true },
       { name: "Frog Pumps (Circuit, x3)", sets: 3, reps: "30", track: false },
       { name: "Dumbbell RDL (Circuit, x3)", sets: 3, reps: "15", track: true },
     ],
@@ -403,6 +403,17 @@ function load() {
         th.exercises.push({ name: "Leg Extension", sets: 3, reps: "15", track: true });
       }
       merged.migrations.thuNoLungesLegExt = true;
+    }
+    if (!merged.migrations.satAbductionSwap && merged.program && merged.program.Saturday) {
+      const sat = merged.program.Saturday;
+      sat.exercises = sat.exercises.filter(e => !/banded\s*abduction|cable\s*a[bd]duction/i.test(e.name || ""));
+      if (!sat.exercises.some(e => /seated\s*abduction/i.test(e.name || ""))) {
+        sat.exercises.splice(1, 0, { name: "Seated Abduction", sets: 3, reps: "15", track: true });
+      }
+      if (!sat.exercises.some(e => /reverse\s*lunge/i.test(e.name || ""))) {
+        sat.exercises.splice(2, 0, { name: "Reverse Lunge (Smith Machine)", sets: 3, reps: "12 each leg", track: true });
+      }
+      merged.migrations.satAbductionSwap = true;
     }
     return merged;
   } catch (e) {
