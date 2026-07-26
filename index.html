@@ -154,6 +154,21 @@
   }
   .slide-in { animation: slideIn .3s cubic-bezier(.2,.8,.3,1) both; }
   @keyframes slideIn { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+  .slide-from-right { animation: slideFromRight .28s cubic-bezier(.2,.8,.3,1) both; }
+  .slide-from-left { animation: slideFromLeft .28s cubic-bezier(.2,.8,.3,1) both; }
+  @keyframes slideFromRight { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+  @keyframes slideFromLeft { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+  /* Prev / next day pager */
+  .day-pager {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin: 0 0 14px 0;
+  }
+  .day-pager button {
+    background: none; border: none; color: var(--pink); font-size: 14px; font-weight: 700;
+    padding: 6px 2px; cursor: pointer; max-width: 45%; overflow: hidden;
+    white-space: nowrap; text-overflow: ellipsis;
+  }
+  .day-pager .spacer { flex: 1; }
   .exercise-title { font-weight: 700; font-size: 16px; }
   .exercise-target { font-size: 14px; color: var(--ink-muted); margin-bottom: 10px; }
   .set-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -806,6 +821,32 @@ let activeTab = "home";
 let editMode = false;
 let chartExercise = "Barbell Hip Thrust";
 let expandedEx = null;   // a finished exercise the user reopened to edit
+let slideDir = "";       // "left" | "right" — direction of the last day change
+
+/* Move between workout days. offset -1 = previous, +1 = next.
+   Swiping right off the first day leaves the session and returns to the list. */
+function goToDay(offset) {
+  if (!state.openDay) return;
+  const i = PROGRAM_DAYS.indexOf(state.openDay);
+  if (i === -1) return;
+  const next = i + offset;
+
+  if (next < 0 || next >= PROGRAM_DAYS.length) {
+    // Off either end: back out to the list of days
+    state.openDay = null;
+    expandedEx = null;
+    slideDir = "";
+    save(); render();
+    scrollTop();
+    return;
+  }
+  state.openDay = PROGRAM_DAYS[next];
+  expandedEx = null;
+  slideDir = offset > 0 ? "right" : "left";
+  save(); render();
+  scrollTop();
+  slideDir = "";
+}
 
 function setTab(tab) {
   activeTab = tab;
@@ -1137,11 +1178,20 @@ function renderDayPage(week, day) {
     : "";
 
   const pct = Math.round((template.exercises.length ? doneCount / template.exercises.length : 0) * 100);
+  const di = PROGRAM_DAYS.indexOf(day);
+  const prevDay = di > 0 ? PROGRAM_DAYS[di - 1] : null;
+  const nextDay = di < PROGRAM_DAYS.length - 1 ? PROGRAM_DAYS[di + 1] : null;
+  const anim = slideDir === "right" ? "slide-from-right" : slideDir === "left" ? "slide-from-left" : "slide-in";
   return `
-    <div class="slide-in">
+    <div class="${anim}">
     <button class="btn ghost small" data-action="back-to-days" style="padding-left:0;margin-bottom:6px;font-size:16px;">‹ Workouts</button>
     <p class="page-sub" style="margin-bottom:2px;">Week ${week} · ${day}</p>
-    <h1 class="page-title" style="margin-top:0;margin-bottom:14px;">${escapeHtml(template.title)} ${done ? "✅" : ""}</h1>
+    <h1 class="page-title" style="margin-top:0;margin-bottom:10px;">${escapeHtml(template.title)} ${done ? "✅" : ""}</h1>
+    <div class="day-pager">
+      ${prevDay ? `<button data-action="prev-day">‹ ${prevDay}</button>` : `<span class="spacer"></span>`}
+      <span class="spacer"></span>
+      ${nextDay ? `<button data-action="next-day">${nextDay} ›</button>` : ""}
+    </div>
     <div id="day-sticky">
       <div class="row" style="gap:10px;">
         <div class="progress-track" style="flex:1;height:8px;"><div class="progress-fill" style="width:${pct}%;"></div></div>
@@ -1667,6 +1717,12 @@ function attachHandlers() {
         scrollTop();
       };
     }
+    if (action === "prev-day") {
+      el.onclick = () => goToDay(-1);
+    }
+    if (action === "next-day") {
+      el.onclick = () => goToDay(1);
+    }
     if (action === "expand-ex") {
       el.onclick = () => {
         expandedEx = el.dataset.ex;
@@ -1992,6 +2048,41 @@ if (state.onboarded) {
 /* Rest timer controls */
 document.getElementById("rest-plus").onclick = () => { restRemaining += 30; updateRestUI(); };
 document.getElementById("rest-skip").onclick = () => stopRestTimer();
+
+/* ============================= SWIPE BETWEEN DAYS =============================
+   On a workout day, swipe left/right to move through the week. Swiping right off
+   the first day exits back to the list, so the back button is optional. */
+(function enableDaySwipe() {
+  const content = document.getElementById("content");
+  let x0 = null, y0 = null, t0 = 0, ignore = false;
+
+  content.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) { ignore = true; return; }
+    const t = e.touches[0];
+    // Don't hijack swipes that begin on a field, control or horizontal scroller
+    ignore = !!(e.target.closest && e.target.closest("input, textarea, select, button, label, canvas, .week-strip"));
+    x0 = t.clientX; y0 = t.clientY; t0 = Date.now();
+  }, { passive: true });
+
+  content.addEventListener("touchend", (e) => {
+    if (ignore || x0 === null) { x0 = null; return; }
+    if (activeTab !== "workout" || !state.openDay || editMode) { x0 = null; return; }
+
+    const t = e.changedTouches[0];
+    const dx = t.clientX - x0;
+    const dy = t.clientY - y0;
+    const dt = Date.now() - t0;
+    x0 = null;
+
+    // Deliberate, mostly-horizontal flick
+    if (dt > 800) return;
+    if (Math.abs(dx) < 60) return;
+    if (Math.abs(dx) < Math.abs(dy) * 1.8) return;
+
+    haptic();
+    goToDay(dx < 0 ? 1 : -1);
+  }, { passive: true });
+})();
 
 /* Haptic feedback on every tap of a button-like control */
 document.addEventListener("click", (e) => {
