@@ -600,6 +600,16 @@ function stopRestTimer() {
   document.getElementById("rest-timer").classList.remove("show");
 }
 
+/* ============================= APPLE HEALTH BRIDGE =============================
+   iOS gives web apps no direct HealthKit access, so we hand the value to the
+   Shortcuts app, which can write to Health. Requires a one-time shortcut setup. */
+function sendToHealth(shortcutName, value) {
+  const url = "shortcuts://run-shortcut?name=" + encodeURIComponent(shortcutName) +
+              "&input=text&text=" + encodeURIComponent(value);
+  showToast("Opening Shortcuts…");
+  setTimeout(() => { window.location.href = url; }, 250);
+}
+
 /* Haptic tap: navigator.vibrate on Android; iOS uses the hidden switch trick (Safari 17.4+) */
 function haptic() {
   try {
@@ -1116,6 +1126,7 @@ function renderProgress() {
         <input id="m-hips" type="number" inputmode="decimal" placeholder="Hips cm" />
       </div>
       <button class="btn" data-action="add-measurement">Save</button>
+      ${measurements.some(m => m.weight != null) ? `<button class="btn secondary" style="margin-top:10px;" data-action="health-weight">❤️ Send weight to Health</button>` : ""}
       ${weightData.length >= 2 ? `
         <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin:18px 0 4px 0;">WEIGHT (KG)</div>
         <canvas id="chart-weight"></canvas>` : ""}
@@ -1291,6 +1302,11 @@ function renderProfile() {
     </div>
 
     <div class="card">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin-bottom:10px;">APPLE HEALTH</div>
+      <p class="empty-hint" style="margin:-4px 0 0 0;">The ❤️ buttons on Progress and Cycle send data to Health via the Shortcuts app. They need two shortcuts named exactly <b>Log Weight</b> and <b>Log Period</b>.</p>
+    </div>
+
+    <div class="card">
       <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin-bottom:12px;">RESET</div>
       <button class="btn secondary" style="margin-bottom:10px;" data-action="reset-program">Program to default</button>
       <button class="btn outline" data-action="reset-data">Erase all data</button>
@@ -1401,6 +1417,7 @@ function renderPeriod() {
     <h1 class="page-title">Cycle</h1>
     <p class="page-sub">Your body, your rhythm</p>
     ${heroHtml}
+    ${c.entries.length ? `<button class="btn secondary" style="margin-bottom:14px;" data-action="health-period" data-state="${c.active ? "start" : "end"}">❤️ Send to Apple Health</button>` : ""}
     ${phaseHtml}
     ${statsHtml}
     ${historyHtml}
@@ -1659,6 +1676,16 @@ function attachHandlers() {
         state.settings.restSeconds = Math.max(10, Number(el.value) || 90);
         save();
       };
+    }
+    if (action === "health-weight") {
+      el.onclick = () => {
+        const withW = state.measurements.filter(m => m.weight != null);
+        if (!withW.length) { showToast("Save a weight first"); return; }
+        sendToHealth("Log Weight", String(withW[withW.length - 1].weight));
+      };
+    }
+    if (action === "health-period") {
+      el.onclick = () => sendToHealth("Log Period", el.dataset.state || "start");
     }
     if (action === "period-start") {
       el.onclick = () => {
