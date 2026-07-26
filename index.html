@@ -378,6 +378,7 @@ function defaultState() {
     onboarded: false,
     settings: { restSeconds: 90 },
     period: { entries: [] },   // entries: [{ start: ISO date, end: ISO date | null }]
+    health: {},                // date -> { weight, rhr, steps, sleep, energy } from Apple Health
   };
 }
 
@@ -598,6 +599,69 @@ function stopRestTimer() {
   clearInterval(restInterval);
   restInterval = null;
   document.getElementById("rest-timer").classList.remove("show");
+}
+
+/* ============================= HEALTH IMPORT =============================
+   Apple Watch + Garmin data both land in Apple Health. A Shortcuts automation
+   reads Health and opens this app with the values in the URL, e.g.
+     ...?health=weight:65.5,rhr:52,steps:8400,sleep:7.2,energy:480
+   Any subset of keys works. Optional &d=YYYY-MM-DD sets the date. */
+const HEALTH_KEYS = {
+  weight: { label: "Weight", unit: "kg" },
+  rhr:    { label: "Resting HR", unit: "bpm" },
+  steps:  { label: "Steps", unit: "" },
+  sleep:  { label: "Sleep", unit: "h" },
+  energy: { label: "Active energy", unit: "kcal" },
+};
+
+function importHealthFromURL() {
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    let raw = params.get("health");
+    if (!raw && window.location.hash.includes("health=")) {
+      raw = new URLSearchParams(window.location.hash.slice(1)).get("health");
+    }
+    if (!raw) return null;
+
+    const date = params.get("d") || todayISO();
+    const parsed = {};
+    raw.split(",").forEach(pair => {
+      const [k, v] = pair.split(":");
+      if (!k || v == null) return;
+      const key = k.trim().toLowerCase();
+      const num = parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
+      if (HEALTH_KEYS[key] && !isNaN(num)) parsed[key] = num;
+    });
+    if (!Object.keys(parsed).length) return null;
+
+    if (!state.health) state.health = {};
+    state.health[date] = Object.assign({}, state.health[date], parsed);
+
+    // A weight reading also feeds the measurements chart
+    if (parsed.weight != null) {
+      const existing = state.measurements.find(m => m.date === date);
+      if (existing) existing.weight = parsed.weight;
+      else state.measurements.push({ date, weight: parsed.weight, waist: null, hips: null });
+      state.measurements.sort((a, b) => a.date.localeCompare(b.date));
+    }
+    save();
+
+    // Tidy the URL so a refresh doesn't re-import
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    return Object.keys(parsed).length;
+  } catch (e) {
+    return null;
+  }
+}
+
+function latestHealth() {
+  if (!state.health) return null;
+  const dates = Object.keys(state.health).sort();
+  if (!dates.length) return null;
+  const d = dates[dates.length - 1];
+  return { date: d, data: state.health[d] };
 }
 
 /* ============================= APPLE HEALTH BRIDGE =============================
@@ -1110,6 +1174,26 @@ function renderProgress() {
       ${gains.length ? gainsRows : `<div class="empty-hint">Log some weights to see your gains here.</div>`}
     </div>
 
+    ${(() => {
+      const lh = latestHealth();
+      const rows = lh ? Object.keys(HEALTH_KEYS).filter(k => lh.data[k] != null) : [];
+      return `
+      <div class="card">
+        <div class="row between" style="margin-bottom:10px;">
+          <h3 class="section-title" style="margin:0;">⌚ From your watch</h3>
+          <button class="btn small ghost" data-action="health-sync" style="padding:2px 6px;min-height:0;font-size:14px;">Sync ↻</button>
+        </div>
+        ${rows.length ? `
+          <div style="font-size:12px;color:var(--ink-muted);margin-bottom:10px;">${lh.date === todayISO() ? "Today" : lh.date}</div>
+          ${rows.map(k => `
+            <div class="row between" style="padding:7px 0;border-top:1px solid var(--border);">
+              <span style="font-size:14px;font-weight:600;">${HEALTH_KEYS[k].label}</span>
+              <span style="font-size:14px;color:var(--ink-soft);"><b>${lh.data[k]}</b>${HEALTH_KEYS[k].unit}</span>
+            </div>`).join("")}
+        ` : `<div class="empty-hint">Apple Watch and Garmin data appears here once your Health shortcut runs. Setup is in Profile.</div>`}
+      </div>`;
+    })()}
+
     <div class="card">
       <h3 class="section-title">Exercise trend</h3>
       <select id="ex-picker" style="width:100%;background:var(--pink-bg);border:none;border-radius:12px;padding:13px;font-size:16px;color:var(--ink);margin-bottom:10px;">
@@ -1303,7 +1387,12 @@ function renderProfile() {
 
     <div class="card">
       <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin-bottom:10px;">APPLE HEALTH</div>
-      <p class="empty-hint" style="margin:-4px 0 0 0;">The ❤️ buttons on Progress and Cycle send data to Health via the Shortcuts app. They need two shortcuts named exactly <b>Log Weight</b> and <b>Log Period</b>.</p>
+      <p class="empty-hint" style="margin:-4px 0 10px 0;">Data flows through the Shortcuts app, which needs shortcuts named exactly:</p>
+      <div style="font-size:13px;color:var(--ink-soft);line-height:1.9;">
+        <b>Sync Health</b> — pulls watch data in (⌚ card on Progress)<br/>
+        <b>Log Weight</b> — sends weight out to Health<br/>
+        <b>Log Period</b> — sends cycle logs out to Health
+      </div>
     </div>
 
     <div class="card">
@@ -1677,6 +1766,9 @@ function attachHandlers() {
         save();
       };
     }
+    if (action === "health-sync") {
+      el.onclick = () => sendToHealth("Sync Health", "pull");
+    }
     if (action === "health-weight") {
       el.onclick = () => {
         const withW = state.measurements.filter(m => m.weight != null);
@@ -1799,7 +1891,14 @@ document.querySelectorAll("#tabbar .tab-btn").forEach(btn => {
     setTab(btn.dataset.tab);
   });
 });
+/* Pull any Apple Health values handed over by the Shortcuts automation */
+const importedCount = importHealthFromURL();
+
 setTab("home");
+
+if (importedCount) {
+  setTimeout(() => showToast("⌚ Health data updated"), 2600);
+}
 
 /* Welcome back splash */
 if (state.onboarded) {
