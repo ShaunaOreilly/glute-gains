@@ -317,7 +317,7 @@ const DEFAULT_PROGRAM = {
       { name: "Single Leg Hip Thrust", sets: 3, reps: "12 each leg", track: true },
       { name: "Smith Machine Squat", sets: 4, reps: "8-10", track: true },
       { name: "Leg Press", sets: 3, reps: "12", track: true },
-      { name: "Cable Abduction", sets: 3, reps: "20", track: true },
+      { name: "Seated Abduction", sets: 3, reps: "20", track: true },
       { name: "Leg Extension", sets: 3, reps: "15", track: true },
     ],
   },
@@ -414,6 +414,12 @@ function load() {
         sat.exercises.splice(2, 0, { name: "Reverse Lunge (Smith Machine)", sets: 3, reps: "12 each leg", track: true });
       }
       merged.migrations.satAbductionSwap = true;
+    }
+    if (!merged.migrations.thuSeatedAbduction && merged.program && merged.program.Thursday) {
+      merged.program.Thursday.exercises.forEach(e => {
+        if (/cable\s*a[bd]duction/i.test(e.name || "")) e.name = "Seated Abduction";
+      });
+      merged.migrations.thuSeatedAbduction = true;
     }
     return merged;
   } catch (e) {
@@ -725,9 +731,7 @@ function renderHome() {
   const doneExInWeek = PROGRAM_DAYS.reduce((a, d) => a + completedExerciseCount(week, d), 0);
   const weekProgress = totalExInWeek ? doneExInWeek / totalExInWeek : 0;
   const streak = currentStreak();
-  const totalWorkouts = totalWorkoutsCompleted();
   const sessionsDone = sessionsThisWeek(week);
-  const nut = state.nutrition[todayISO()] || {};
   const greetName = state.name ? state.name : "there";
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -738,15 +742,9 @@ function renderHome() {
   const todayProgress = totalToday ? doneToday / totalToday : 0;
   const todayDone = totalToday > 0 && doneToday >= totalToday;
   const heroBtn = !template ? "" :
-    todayDone ? `<button class="btn small" data-action="go-today">Done — nice work! ✅</button>` :
-    doneToday > 0 ? `<button class="btn small" data-action="go-today">Continue (${doneToday}/${totalToday} done)</button>` :
-    `<button class="btn small" data-action="go-today">Start Workout</button>`;
-
-  // Nutrition vs her targets
-  const proteinTarget = state.goals.proteinTarget || 130;
-  const waterTarget = state.goals.waterTarget || 2.5;
-  const proteinPct = Math.min(100, Math.round(((nut.protein || 0) / proteinTarget) * 100));
-  const waterPct = Math.min(100, Math.round(((nut.water || 0) / waterTarget) * 100));
+    todayDone ? `<button class="btn small secondary" data-action="go-today">✓ Completed</button>` :
+    doneToday > 0 ? `<button class="btn small" data-action="go-today">Continue</button>` :
+    `<button class="btn small" data-action="go-today">Start</button>`;
 
   // Hip thrust: best logged weight vs her goal
   const hipBest = bestWeightForExercise("Barbell Hip Thrust") || state.goals.hipThrustKg;
@@ -759,22 +757,22 @@ function renderHome() {
 
   const goalsCard = (hipGoal || state.goals.goalWeightKg) ? `
     <div class="card">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin-bottom:12px;">GOALS</div>
       ${hipGoal ? `
         <div class="row between" style="margin-bottom:6px;">
-          <span style="font-weight:700;">Hip Thrust PB</span>
-          <span style="color:var(--ink-soft);">${hipBest ? hipBest + "kg" : "—"} / <b style="color:var(--pink-dark);">${hipGoal}kg goal</b></span>
+          <span style="font-size:14px;font-weight:600;">Hip thrust</span>
+          <span style="font-size:14px;color:var(--ink-soft);">${hipBest ?? "—"} → <b style="color:var(--pink-dark);">${hipGoal}kg</b></span>
         </div>
-        <div class="progress-track" style="margin-bottom:${state.goals.goalWeightKg ? "14px" : "0"};"><div class="progress-fill" style="width:${hipPct}%;"></div></div>` : ""}
+        <div class="progress-track" style="height:8px;margin-bottom:${state.goals.goalWeightKg ? "14px" : "0"};"><div class="progress-fill" style="width:${hipPct}%;"></div></div>` : ""}
       ${state.goals.goalWeightKg ? `
         <div class="row between">
-          <span style="font-weight:700;">Weight</span>
-          <span style="color:var(--ink-soft);">${curWeight ? curWeight + "kg" : "—"} → <b style="color:var(--pink-dark);">${state.goals.goalWeightKg}kg goal</b></span>
+          <span style="font-size:14px;font-weight:600;">Weight</span>
+          <span style="font-size:14px;color:var(--ink-soft);">${curWeight ?? "—"} → <b style="color:var(--pink-dark);">${state.goals.goalWeightKg}kg</b></span>
         </div>` : ""}
     </div>` : `
     <div class="card" style="text-align:center;">
-      <div style="font-weight:700;margin-bottom:6px;">Make it yours 🎯</div>
-      <div style="font-size:14px;color:var(--ink-soft);margin-bottom:12px;">Set your hip thrust and weight goals so I can track them here for you.</div>
-      <button class="btn small secondary" data-action="go-tab" data-tab="profile">Set my goals</button>
+      <div style="font-weight:700;margin-bottom:10px;">Set your goals 🎯</div>
+      <button class="btn small secondary" data-action="go-tab" data-tab="profile">Add goals</button>
     </div>`;
 
   return `
@@ -782,21 +780,20 @@ function renderHome() {
     <h1 class="page-title" style="margin-bottom:16px;">${escapeHtml(greetName)} 🍑</h1>
 
     <div class="card hero-card row" style="align-items:center;">
-      ${isTrainingDay ? ring(todayProgress, 92, doneToday + "/" + totalToday, "today") : ring(weekProgress, 92, "Week " + week)}
+      ${isTrainingDay ? ring(todayProgress, 92, doneToday + "/" + totalToday) : ring(weekProgress, 92, "W" + week)}
       <div style="flex:1;margin-left:16px;">
-        <div class="badge" style="background:#fff;">Today · ${today}</div>
-        <div style="font-size:22px;font-weight:800;line-height:1.25;margin:6px 0 3px 0;">${template ? template.title : "Rest Day"}</div>
-        <div style="font-size:14px;color:var(--ink-soft);margin-bottom:12px;">${template ? (todayDone ? "All " + totalToday + " exercises logged 💪" : totalToday + " exercises") : "Recovery is part of the plan"}</div>
-        ${heroBtn}
+        <div class="badge" style="background:#fff;">${today}</div>
+        <div style="font-size:22px;font-weight:800;line-height:1.25;margin:8px 0 12px 0;">${template ? template.title : "Rest Day"}</div>
+        ${template ? heroBtn : `<div style="font-size:14px;color:var(--ink-soft);">Recovery is part of the plan</div>`}
       </div>
     </div>
 
     <div class="card">
-      <div class="row between" style="margin-bottom:12px;">
-        <span style="font-weight:700;">Sessions this week</span>
-        <span style="font-weight:800;color:${sessionsDone >= 5 ? "var(--green)" : "var(--pink-dark)"};font-size:17px;">${sessionsDone} of 5</span>
+      <div class="row between" style="margin-bottom:14px;">
+        <span style="font-weight:700;">This week</span>
+        <span style="font-weight:800;color:${sessionsDone >= 5 ? "var(--green)" : "var(--pink-dark)"};font-size:17px;">${sessionsDone}/5</span>
       </div>
-      <div class="row" style="gap:6px;margin-bottom:12px;">
+      <div class="row" style="gap:6px;">
         ${PROGRAM_DAYS.map(d => {
           const dLog = state.logs[dayKey(week, d)];
           const dDone = dLog && dLog.dayCompleted;
@@ -807,43 +804,7 @@ function renderHome() {
           </div>`;
         }).join("")}
       </div>
-      <div style="font-size:14px;color:var(--ink-soft);margin-bottom:12px;">${
-        sessionsDone >= 5 ? "All 5 done — superstar week! 🌟" :
-        sessionsDone === 4 ? "One more for the full 5. So close! 🔥" :
-        sessionsDone === 0 ? "Fresh week — let's get all 5. 💪" :
-        sessionsDone + " down, " + (5 - sessionsDone) + " to go this week."
-      }</div>
-      <div class="row between" style="margin-bottom:6px;">
-        <span style="font-size:13px;font-weight:600;color:var(--ink-muted);">EXERCISES · WEEK ${week} OF 12</span>
-        <span style="font-size:13px;color:var(--ink-soft);">${doneExInWeek} of ${totalExInWeek}</span>
-      </div>
-      <div class="progress-track" style="height:8px;"><div class="progress-fill" style="width:${Math.round(weekProgress*100)}%;"></div></div>
-    </div>
-
-    <div class="grid2" style="margin-bottom:16px;">
-      <div class="stat-pill"><div class="label">🔥 Streak</div><div class="value">${streak} day${streak===1?"":"s"}</div></div>
-      <div class="stat-pill"><div class="label">🏋️ Workouts</div><div class="value">${totalWorkouts}</div></div>
-    </div>
-
-    <div class="card">
-      <div class="row between" style="margin-bottom:10px;">
-        <h3 class="section-title" style="margin:0;">Today's nutrition</h3>
-        <button class="btn small ghost" data-action="go-tab" data-tab="nutrition" style="padding:4px 8px;min-height:0;">Log →</button>
-      </div>
-      <div class="row between" style="margin-bottom:5px;">
-        <span style="font-size:14px;font-weight:600;">Protein</span>
-        <span style="font-size:14px;color:var(--ink-soft);">${nut.protein || 0}g / ${proteinTarget}g</span>
-      </div>
-      <div class="progress-track" style="height:8px;margin-bottom:12px;"><div class="progress-fill" style="width:${proteinPct}%;"></div></div>
-      <div class="row between" style="margin-bottom:5px;">
-        <span style="font-size:14px;font-weight:600;">Water</span>
-        <span style="font-size:14px;color:var(--ink-soft);">${nut.water || 0}L / ${waterTarget}L</span>
-      </div>
-      <div class="progress-track" style="height:8px;margin-bottom:12px;"><div class="progress-fill" style="width:${waterPct}%;"></div></div>
-      <div class="row between">
-        <span style="font-size:14px;font-weight:600;">Calories</span>
-        <span style="font-size:14px;color:var(--ink-soft);">${nut.calories ?? "—"}</span>
-      </div>
+      <div style="font-size:12px;color:var(--ink-muted);margin-top:14px;">Week ${week} of 12${streak ? ` · 🔥 ${streak} day streak` : ""}</div>
     </div>
 
     ${goalsCard}
@@ -947,7 +908,7 @@ function renderWorkout() {
             <div>
               <div style="font-size:12px;color:var(--ink-muted);font-weight:700;letter-spacing:.3px;">${day.toUpperCase()}</div>
               <div style="font-size:17px;font-weight:800;">${template.title}</div>
-              <div style="font-size:13px;color:var(--ink-muted);">${editMode ? "Editing this day" : doneCount + "/" + template.exercises.length + " exercises logged"}</div>
+              <div style="font-size:13px;color:var(--ink-muted);">${editMode ? "Editing" : doneCount + "/" + template.exercises.length}</div>
             </div>
           </div>
           ${editMode ? "" : `<div style="font-size:26px;color:var(--pink);font-weight:700;">›</div>`}
@@ -964,7 +925,7 @@ function renderWorkout() {
       </div>
       <button class="btn ${editMode ? "secondary" : "outline"} small" data-action="toggle-edit-mode">${editMode ? "✓ Done" : "✏️ Edit"}</button>
     </div>
-    ${editMode ? `<div class="empty-hint" style="margin:-6px 0 14px 0;">Editing applies across all 12 weeks. Renaming or deleting an exercise starts fresh tracking for it.</div>` : ""}
+    ${editMode ? `<div class="empty-hint" style="margin:-6px 0 14px 0;">Edits apply to all 12 weeks.</div>` : ""}
     <div class="week-strip">${weekChips}</div>
     ${dayCards}
   `;
@@ -999,13 +960,6 @@ function renderDayPage(week, day) {
           <button class="check-btn ${s.completed ? "done" : ""}" data-action="toggle-set" data-week="${week}" data-day="${day}" data-ex="${k}" data-set="${si}">✓</button>
         </div>`;
     });
-    const setHeader = `
-      <div class="set-row" style="margin-bottom:4px;">
-        <span class="setnum" style="font-size:11px;font-weight:700;">SET</span>
-        <span style="flex:1;text-align:center;font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--ink-muted);">REPS</span>
-        <span style="flex:1;text-align:center;font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--ink-muted);">WEIGHT (KG)</span>
-        <span style="width:42px;"></span>
-      </div>`;
     // Last week's top weight, change so far, and a progression suggestion
     let lastWeekHtml = "";
     if (ex.track) {
@@ -1015,64 +969,69 @@ function renderDayPage(week, day) {
         let deltaHtml = "";
         if (thisW != null) {
           const d = +(thisW - lastW).toFixed(2);
-          deltaHtml = d > 0 ? ` <b style="color:var(--green);">▲ +${d}kg</b>` :
-                      d < 0 ? ` <b style="color:var(--pink-dark);">▼ ${d}kg</b>` :
-                      ` <span style="color:var(--ink-muted);">same as last week</span>`;
+          deltaHtml = d > 0 ? ` <b style="color:var(--green);">▲ +${d}</b>` :
+                      d < 0 ? ` <b style="color:var(--pink-dark);">▼ ${d}</b>` :
+                      ` <span style="color:var(--ink-muted);">same</span>`;
         } else if (lastEx && lastEx.sets.length && lastEx.sets.every(s => s.completed)) {
           // She completed every set last week — nudge her up
-          deltaHtml = ` <b style="color:var(--pink-dark);">💡 Try ${+(lastW + 2.5).toFixed(1)}kg</b>`;
+          deltaHtml = ` <b style="color:var(--pink-dark);">💡 try ${+(lastW + 2.5).toFixed(1)}</b>`;
         }
-        lastWeekHtml = `<div style="font-size:13px;color:var(--ink-soft);margin:-6px 0 8px 0;">Last week: <b>${lastW}kg</b>${deltaHtml}</div>`;
+        lastWeekHtml = `<div style="font-size:13px;color:var(--ink-muted);margin:-4px 0 10px 0;">Last week <b style="color:var(--ink-soft);">${lastW}kg</b>${deltaHtml}</div>`;
       }
     }
     exercisesHtml += `
       <div class="exercise-row">
-        <div class="exercise-title">${escapeHtml(ex.name)}</div>
-        <div class="exercise-target">Target: ${ex.sets} x ${escapeHtml(ex.reps)}</div>
+        <div class="row between" style="align-items:baseline;">
+          <div class="exercise-title">${escapeHtml(ex.name)}</div>
+          <div style="font-size:13px;color:var(--ink-muted);white-space:nowrap;">${ex.sets} × ${escapeHtml(ex.reps)}</div>
+        </div>
         ${lastWeekHtml}
-        ${setHeader}
         ${setsHtml}
       </div>`;
   });
 
+  const colHeader = `
+    <div class="set-row" style="margin-bottom:2px;">
+      <span class="setnum"></span>
+      <span style="flex:1;text-align:center;font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);">REPS</span>
+      <span style="flex:1;text-align:center;font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);">KG</span>
+      <span style="width:42px;"></span>
+    </div>`;
+
   const warmupHtml = template.warmup.length
-    ? `<div class="card"><h3 class="section-title" style="margin-bottom:8px;">Warm up</h3>${template.warmup.map(w => `<span class="tag">${escapeHtml(w)}</span>`).join("")}</div>`
+    ? `<div class="card" style="padding:14px 18px;">
+         <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin-bottom:8px;">WARM UP</div>
+         ${template.warmup.map(w => `<span class="tag">${escapeHtml(w)}</span>`).join("")}
+       </div>`
     : "";
 
   return `
-    <button class="btn ghost small" data-action="back-to-days" style="padding-left:0;margin-bottom:8px;font-size:16px;">‹ All workouts</button>
-    <div class="row between" style="align-items:flex-start;">
-      <div>
-        <p class="page-sub" style="margin-bottom:2px;">Week ${week} · ${day}</p>
-        <h1 class="page-title" style="margin-top:0;">${escapeHtml(template.title)} ${done ? "✅" : ""}</h1>
-      </div>
-    </div>
-    <div class="card" style="padding:12px 18px;">
-      <div class="row between" style="margin-bottom:8px;">
-        <span style="font-weight:700;">Progress</span>
-        <span style="font-size:14px;color:var(--ink-soft);">${doneCount} of ${template.exercises.length} exercises</span>
-      </div>
-      <div class="progress-track"><div class="progress-fill" style="width:${Math.round((template.exercises.length ? doneCount/template.exercises.length : 0)*100)}%;"></div></div>
+    <button class="btn ghost small" data-action="back-to-days" style="padding-left:0;margin-bottom:6px;font-size:16px;">‹ Workouts</button>
+    <p class="page-sub" style="margin-bottom:2px;">Week ${week} · ${day}</p>
+    <h1 class="page-title" style="margin-top:0;">${escapeHtml(template.title)} ${done ? "✅" : ""}</h1>
+    <div class="row" style="gap:10px;margin:0 0 18px 0;">
+      <div class="progress-track" style="flex:1;height:8px;"><div class="progress-fill" style="width:${Math.round((template.exercises.length ? doneCount/template.exercises.length : 0)*100)}%;"></div></div>
+      <span style="font-size:13px;font-weight:700;color:var(--ink-muted);white-space:nowrap;">${doneCount}/${template.exercises.length}</span>
     </div>
     ${warmupHtml}
     <div class="card">
+      ${colHeader}
       ${exercisesHtml}
-      <button class="btn secondary" style="margin-top:16px;" data-action="finish-day" data-week="${week}" data-day="${day}">Mark Day Complete</button>
+      <button class="btn secondary" style="margin-top:18px;" data-action="finish-day" data-week="${week}" data-day="${day}">Mark Day Complete</button>
     </div>
-    <div class="card">
-      <h3 class="section-title" style="margin-bottom:8px;">Plate calculator 🏋️</h3>
+    <div class="card" style="padding:14px 18px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin-bottom:10px;">PLATE CALCULATOR</div>
       <div class="row" style="gap:8px;">
         <input type="number" id="plate-weight" inputmode="decimal" placeholder="Total kg" style="flex:1;"/>
-        <select id="plate-bar" style="flex:1;background:var(--pink-bg);border:1px solid var(--border);border-radius:12px;padding:12px;font-size:16px;color:var(--ink);">
+        <select id="plate-bar" style="flex:1;background:var(--pink-bg);border:none;border-radius:12px;padding:13px;font-size:16px;color:var(--ink);">
           <option value="20">20kg bar</option>
           <option value="15">15kg bar</option>
           <option value="10">10kg bar</option>
-          <option value="0">Machine / no bar</option>
+          <option value="0">No bar</option>
         </select>
       </div>
-      <div id="plate-result" class="empty-hint" style="margin-top:10px;">Type the total weight to see plates per side.</div>
+      <div id="plate-result" class="empty-hint" style="margin-top:10px;">Enter a weight for plates per side.</div>
     </div>
-    <button class="btn outline" data-action="back-to-days" style="margin-bottom:8px;">‹ Back to all workouts</button>
   `;
 }
 
@@ -1088,14 +1047,14 @@ function renderProgress() {
   const gainsRows = gains.map(g => {
     let right;
     if (g.thisW != null && g.lastW != null) {
-      const badge = g.delta > 0 ? `<b style="color:var(--green);">▲ +${g.delta}kg</b>` :
-                    g.delta < 0 ? `<b style="color:var(--pink-dark);">▼ ${g.delta}kg</b>` :
-                    `<span style="color:var(--ink-muted);">—</span>`;
-      right = `${g.lastW}kg → <b>${g.thisW}kg</b> &nbsp;${badge}`;
+      const badge = g.delta > 0 ? `<b style="color:var(--green);">${g.thisW}kg ▲</b>` :
+                    g.delta < 0 ? `<b style="color:var(--pink-dark);">${g.thisW}kg ▼</b>` :
+                    `<b>${g.thisW}kg</b>`;
+      right = `<span style="color:var(--ink-muted);">${g.lastW} →</span> ${badge}`;
     } else if (g.thisW != null) {
-      right = `<b>${g.thisW}kg</b> <span style="color:var(--ink-muted);">this week</span>`;
+      right = `<b>${g.thisW}kg</b>`;
     } else {
-      right = `${g.lastW}kg <span style="color:var(--ink-muted);">last week — not lifted yet</span>`;
+      right = `<span style="color:var(--ink-muted);">${g.lastW}kg</span>`;
     }
     return `
       <div class="row between" style="padding:9px 0;border-top:1px solid var(--border);">
@@ -1122,66 +1081,57 @@ function renderProgress() {
     <p class="page-sub">Your transformation, visualised</p>
 
     <div class="card hero-card">
-      <div class="row between" style="margin-bottom:10px;">
-        <h3 class="section-title" style="margin:0;">Week ${wk} recap</h3>
-        ${volDelta != null ? `<span style="font-weight:800;color:${volDelta >= 0 ? "var(--green)" : "var(--pink-dark)"};">${volDelta >= 0 ? "▲ +" : "▼ "}${volDelta}% vs last week</span>` : ""}
+      <div class="row between" style="margin-bottom:12px;">
+        <span style="font-weight:700;">Week ${wk}</span>
+        ${volDelta != null ? `<span style="font-weight:800;color:${volDelta >= 0 ? "var(--green)" : "var(--pink-dark)"};">${volDelta >= 0 ? "▲ +" : "▼ "}${volDelta}%</span>` : ""}
       </div>
       <div class="grid3">
         <div class="stat-pill"><div class="label">Sessions</div><div class="value" style="font-size:19px;color:${sessionsThisWeek(wk) >= 5 ? "var(--green)" : "inherit"};">${sessionsThisWeek(wk)}/5</div></div>
-        <div class="stat-pill"><div class="label">Total lifted</div><div class="value" style="font-size:19px;">${recapThis.vol.toLocaleString()}kg</div></div>
-        <div class="stat-pill"><div class="label">Sets done</div><div class="value" style="font-size:19px;">${recapThis.sets}</div></div>
+        <div class="stat-pill"><div class="label">Lifted</div><div class="value" style="font-size:19px;">${recapThis.vol.toLocaleString()}kg</div></div>
+        <div class="stat-pill"><div class="label">Sets</div><div class="value" style="font-size:19px;">${recapThis.sets}</div></div>
       </div>
-      ${recapLast.vol > 0 ? `<div style="font-size:13px;color:var(--ink-soft);margin-top:8px;">Last week: ${recapLast.vol.toLocaleString()}kg across ${recapLast.sets} sets</div>` : ""}
     </div>
 
     <div class="card">
-      <div class="row between" style="margin-bottom:4px;">
+      <div class="row between" style="margin-bottom:2px;">
         <h3 class="section-title" style="margin:0;">Strength gains 💪</h3>
-        <span style="font-size:13px;color:var(--ink-muted);">Week ${state.currentWeek} vs ${state.currentWeek > 1 ? "Week " + (state.currentWeek - 1) : "start"}</span>
+        <span style="font-size:12px;color:var(--ink-muted);">vs last week</span>
       </div>
-      <div style="font-size:13px;color:var(--ink-muted);margin-bottom:6px;">Top weight per exercise, this week vs last</div>
-      ${gains.length ? gainsRows : `<div class="empty-hint">Log your weights during workouts and your weekly increases will show up here.</div>`}
+      ${gains.length ? gainsRows : `<div class="empty-hint">Log some weights to see your gains here.</div>`}
     </div>
 
     <div class="card">
-      <h3 class="section-title">Exercise trend (kg)</h3>
-      <select id="ex-picker" style="width:100%;background:var(--pink-bg);border:1px solid var(--border);border-radius:12px;padding:12px;font-size:16px;color:var(--ink);margin-bottom:10px;">
+      <h3 class="section-title">Exercise trend</h3>
+      <select id="ex-picker" style="width:100%;background:var(--pink-bg);border:none;border-radius:12px;padding:13px;font-size:16px;color:var(--ink);margin-bottom:10px;">
         ${allTracked.map(n => `<option value="${escapeHtml(n)}" ${n === chartExercise ? "selected" : ""}>${escapeHtml(n)}</option>`).join("")}
       </select>
-      ${exPoints.length >= 2 ? `<canvas id="chart-ex"></canvas>` : `<div class="empty-hint">Log ${escapeHtml(chartExercise)} for a couple of weeks to see your trend here.</div>`}
+      ${exPoints.length >= 2 ? `<canvas id="chart-ex"></canvas>` : `<div class="empty-hint">Needs 2+ weeks of data.</div>`}
     </div>
 
     <div class="card">
-      <h3 class="section-title">Body Weight (kg)</h3>
-      ${weightData.length >= 2 ? `<canvas id="chart-weight"></canvas>` : `<div class="empty-hint">Add a couple of measurements below to see your trend.</div>`}
-    </div>
-
-    <div class="card">
-      <h3 class="section-title">Hip Measurement (cm)</h3>
-      ${hipsData.length >= 2 ? `<canvas id="chart-hips"></canvas>` : `<div class="empty-hint">Add a couple of measurements below to see your trend.</div>`}
-    </div>
-
-    <div class="card">
-      <h3 class="section-title">Add Measurement</h3>
+      <h3 class="section-title">Measurements</h3>
       <div class="grid3" style="margin-bottom:10px;">
         <input id="m-weight" type="number" inputmode="decimal" placeholder="Weight kg" />
         <input id="m-waist" type="number" inputmode="decimal" placeholder="Waist cm" />
         <input id="m-hips" type="number" inputmode="decimal" placeholder="Hips cm" />
       </div>
-      <button class="btn" data-action="add-measurement">Save Measurement</button>
-      ${measurements.length ? `<div style="margin-top:14px;">` + measurements.slice().reverse().slice(0,5).map(m => `
-        <div class="row between" style="padding:6px 0;border-top:1px solid var(--border);font-size:13px;">
-          <span style="color:var(--ink-muted);">${m.date}</span>
-          <span>${m.weight ?? "—"}kg · Waist ${m.waist ?? "—"}cm · Hips ${m.hips ?? "—"}cm</span>
+      <button class="btn" data-action="add-measurement">Save</button>
+      ${weightData.length >= 2 ? `
+        <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin:18px 0 4px 0;">WEIGHT (KG)</div>
+        <canvas id="chart-weight"></canvas>` : ""}
+      ${hipsData.length >= 2 ? `
+        <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin:14px 0 4px 0;">HIPS (CM)</div>
+        <canvas id="chart-hips"></canvas>` : ""}
+      ${measurements.length ? `<div style="margin-top:14px;">` + measurements.slice().reverse().slice(0,3).map(m => `
+        <div class="row between" style="padding:7px 0;border-top:1px solid var(--border);font-size:13px;">
+          <span style="color:var(--ink-muted);">${m.date.slice(5)}</span>
+          <span>${m.weight ?? "—"}kg · ${m.waist ?? "—"}cm · ${m.hips ?? "—"}cm</span>
         </div>`).join("") + `</div>` : ""}
     </div>
 
-    <div class="card">
-      <h3 class="section-title">Consistency</h3>
-      <div class="grid2">
-        <div class="stat-pill"><div class="label">Workouts Done</div><div class="value">${totalWorkoutsCompleted()}</div></div>
-        <div class="stat-pill"><div class="label">Total Sets</div><div class="value">${totalSets}</div></div>
-      </div>
+    <div class="grid2" style="margin-bottom:16px;">
+      <div class="stat-pill"><div class="label">Workouts</div><div class="value">${totalWorkoutsCompleted()}</div></div>
+      <div class="stat-pill"><div class="label">Total sets</div><div class="value">${totalSets}</div></div>
     </div>
   `;
 }
@@ -1266,29 +1216,28 @@ function renderNutrition() {
     <p class="page-sub">${today}</p>
 
     <div class="card">
-      <h3 class="section-title">Today</h3>
-      <div class="row between" style="margin-bottom:8px;">
-        <span style="font-size:14px;">Calories</span>
-        <input type="number" inputmode="numeric" style="width:90px;" value="${entry.calories ?? ""}" data-action="set-nutrition" data-field="calories" placeholder="kcal"/>
-      </div>
       <div class="row between" style="margin-bottom:6px;">
-        <span style="font-size:14px;">Protein (target ${targets.proteinTarget}g)</span>
+        <span style="font-size:15px;font-weight:600;">Protein <span style="color:var(--ink-muted);font-weight:400;">/ ${targets.proteinTarget}g</span></span>
         <input type="number" inputmode="numeric" style="width:90px;" value="${entry.protein ?? ""}" data-action="set-nutrition" data-field="protein" placeholder="g"/>
       </div>
-      <div class="progress-track" style="margin-bottom:14px;"><div class="progress-fill" style="width:${proteinPct}%;"></div></div>
+      <div class="progress-track" style="height:8px;margin-bottom:16px;"><div class="progress-fill" style="width:${proteinPct}%;"></div></div>
       <div class="row between" style="margin-bottom:6px;">
-        <span style="font-size:14px;">Water (target ${targets.waterTarget}L)</span>
+        <span style="font-size:15px;font-weight:600;">Water <span style="color:var(--ink-muted);font-weight:400;">/ ${targets.waterTarget}L</span></span>
         <input type="number" inputmode="decimal" style="width:90px;" value="${entry.water ?? ""}" data-action="set-nutrition" data-field="water" placeholder="L"/>
       </div>
-      <div class="progress-track"><div class="progress-fill" style="width:${waterPct}%;"></div></div>
+      <div class="progress-track" style="height:8px;margin-bottom:16px;"><div class="progress-fill" style="width:${waterPct}%;"></div></div>
+      <div class="row between">
+        <span style="font-size:15px;font-weight:600;">Calories</span>
+        <input type="number" inputmode="numeric" style="width:90px;" value="${entry.calories ?? ""}" data-action="set-nutrition" data-field="calories" placeholder="kcal"/>
+      </div>
     </div>
 
     <div class="card">
-      <h3 class="section-title">7-Day Averages</h3>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin-bottom:10px;">7-DAY AVERAGE</div>
       <div class="grid3">
-        <div class="stat-pill"><div class="label">Calories</div><div class="value" style="font-size:16px;">${avg("calories") ?? "—"}</div></div>
-        <div class="stat-pill"><div class="label">Protein</div><div class="value" style="font-size:16px;">${avg("protein") ?? "—"}</div></div>
-        <div class="stat-pill"><div class="label">Water</div><div class="value" style="font-size:16px;">${avg("water") ?? "—"}</div></div>
+        <div class="stat-pill"><div class="label">Protein</div><div class="value" style="font-size:17px;">${avg("protein") ?? "—"}</div></div>
+        <div class="stat-pill"><div class="label">Water</div><div class="value" style="font-size:17px;">${avg("water") ?? "—"}</div></div>
+        <div class="stat-pill"><div class="label">Calories</div><div class="value" style="font-size:17px;">${avg("calories") ?? "—"}</div></div>
       </div>
     </div>
   `;
@@ -1303,68 +1252,48 @@ function renderProfile() {
     <p class="page-sub">Goals & settings</p>
 
     <div class="card">
-      <h3 class="section-title">Your Name</h3>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin-bottom:10px;">NAME</div>
       <input id="p-name" type="text" placeholder="Your name" value="${escapeHtml(state.name)}" data-action="set-name" />
     </div>
 
     <div class="card">
-      <h3 class="section-title">Goals</h3>
-      <div class="row between" style="margin-bottom:8px;">
-        <span style="font-size:14px;">Goal Weight (kg)</span>
-        <input type="number" inputmode="decimal" style="width:90px;" value="${g.goalWeightKg ?? ""}" data-action="set-goal" data-field="goalWeightKg"/>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin-bottom:12px;">GOALS</div>
+      <div class="row between" style="margin-bottom:10px;">
+        <span style="font-size:15px;">Weight</span>
+        <input type="number" inputmode="decimal" style="width:100px;" placeholder="kg" value="${g.goalWeightKg ?? ""}" data-action="set-goal" data-field="goalWeightKg"/>
       </div>
-      <div class="row between" style="margin-bottom:8px;">
-        <span style="font-size:14px;">Goal Hip Thrust (kg)</span>
-        <input type="number" inputmode="decimal" style="width:90px;" value="${g.goalHipThrustKg ?? ""}" data-action="set-goal" data-field="goalHipThrustKg"/>
+      <div class="row between" style="margin-bottom:10px;">
+        <span style="font-size:15px;">Hip thrust</span>
+        <input type="number" inputmode="decimal" style="width:100px;" placeholder="kg" value="${g.goalHipThrustKg ?? ""}" data-action="set-goal" data-field="goalHipThrustKg"/>
       </div>
-      <div class="row between" style="margin-bottom:8px;">
-        <span style="font-size:14px;">Protein Target (g)</span>
-        <input type="number" inputmode="numeric" style="width:90px;" value="${g.proteinTarget ?? ""}" data-action="set-goal" data-field="proteinTarget"/>
+      <div class="row between" style="margin-bottom:10px;">
+        <span style="font-size:15px;">Protein</span>
+        <input type="number" inputmode="numeric" style="width:100px;" placeholder="g" value="${g.proteinTarget ?? ""}" data-action="set-goal" data-field="proteinTarget"/>
       </div>
-      <div class="row between" style="margin-bottom:8px;">
-        <span style="font-size:14px;">Water Target (L)</span>
-        <input type="number" inputmode="decimal" style="width:90px;" value="${g.waterTarget ?? ""}" data-action="set-goal" data-field="waterTarget"/>
+      <div class="row between" style="margin-bottom:10px;">
+        <span style="font-size:15px;">Water</span>
+        <input type="number" inputmode="decimal" style="width:100px;" placeholder="L" value="${g.waterTarget ?? ""}" data-action="set-goal" data-field="waterTarget"/>
       </div>
       <div class="row between">
-        <span style="font-size:14px;">Rest Timer (seconds)</span>
-        <input type="number" inputmode="numeric" style="width:90px;" value="${(state.settings && state.settings.restSeconds) ?? 90}" data-action="set-rest"/>
+        <span style="font-size:15px;">Rest timer</span>
+        <input type="number" inputmode="numeric" style="width:100px;" placeholder="secs" value="${(state.settings && state.settings.restSeconds) ?? 90}" data-action="set-rest"/>
       </div>
     </div>
 
     <div class="card">
-      <h3 class="section-title">Current Stats</h3>
-      <div class="row between" style="padding:4px 0;"><span style="color:var(--ink-soft);">Current Hip Thrust PR</span><b>${bestHipThrust != null ? bestHipThrust + "kg" : "—"}</b></div>
-      <div class="row between" style="padding:4px 0;"><span style="color:var(--ink-soft);">Workouts Completed</span><b>${totalWorkoutsCompleted()}</b></div>
-      <div class="row between" style="padding:4px 0;"><span style="color:var(--ink-soft);">Current Streak</span><b>${currentStreak()} days</b></div>
-    </div>
-
-    <div class="card">
-      <h3 class="section-title">📲 Add to Home Screen</h3>
-      <div class="install-steps">
-        On iPhone: tap the <b>Share</b> button in Safari → <b>Add to Home Screen</b>.<br/>
-        It'll then open full-screen like a real app, with your data saved right on your phone.
-      </div>
-    </div>
-
-    <div class="card">
-      <h3 class="section-title">Program</h3>
-      <p class="empty-hint" style="margin-top:-4px;">Edit exercises anytime from the ✏️ button on the Workouts tab.</p>
-      <button class="btn secondary" style="margin-bottom:10px;" data-action="reset-program">Reset Program to Default</button>
-    </div>
-
-    <div class="card">
-      <h3 class="section-title">Backup 🔐</h3>
-      <p class="empty-hint" style="margin-top:-4px;">Your data lives only on this phone. Save a backup every so often so you can never lose your progress.</p>
-      <button class="btn" style="margin-bottom:10px;" data-action="export-data">⬇️ Backup My Data</button>
-      <label class="btn secondary" style="margin-bottom:2px;">
-        📂 Restore From Backup
+      <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin-bottom:10px;">BACKUP</div>
+      <p class="empty-hint" style="margin:-4px 0 12px 0;">Your data lives only on this phone.</p>
+      <button class="btn" style="margin-bottom:10px;" data-action="export-data">⬇️ Save backup</button>
+      <label class="btn secondary">
+        📂 Restore
         <input type="file" id="restore-file" accept=".json,application/json" style="display:none;width:auto;"/>
       </label>
     </div>
 
     <div class="card">
-      <h3 class="section-title">Data</h3>
-      <button class="btn outline" data-action="reset-data">Reset All Data</button>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin-bottom:12px;">RESET</div>
+      <button class="btn secondary" style="margin-bottom:10px;" data-action="reset-program">Program to default</button>
+      <button class="btn outline" data-action="reset-data">Erase all data</button>
     </div>
   `;
 }
@@ -1403,17 +1332,17 @@ function renderPeriod() {
       <div class="card hero-card" style="text-align:center;">
         <div style="font-size:44px;margin-bottom:6px;">🌸</div>
         <div style="font-size:20px;font-weight:800;margin-bottom:6px;">Track your cycle</div>
-        <div style="font-size:14px;color:var(--ink-soft);margin-bottom:14px;">Log your period and I'll learn your cycle, predict the next one, and match training tips to where you are in the month.</div>
-        <button class="btn" data-action="period-start">My period started today</button>
+        <div style="font-size:14px;color:var(--ink-soft);margin-bottom:14px;">Log your period to get predictions and phase-matched training tips.</div>
+        <button class="btn" data-action="period-start">Period started today</button>
       </div>`;
   } else if (c.active) {
     const dayOfPeriod = Math.floor((new Date(todayISO()) - new Date(c.last.start)) / 86400000) + 1;
     heroHtml = `
       <div class="card hero-card" style="text-align:center;">
         <div style="font-size:44px;margin-bottom:6px;">🩸</div>
-        <div style="font-size:20px;font-weight:800;margin-bottom:4px;">Day ${dayOfPeriod} of your period</div>
-        <div style="font-size:14px;color:var(--ink-soft);margin-bottom:14px;">Started ${niceDate(new Date(c.last.start))}. Be kind to yourself — lighter sessions still count.</div>
-        <button class="btn" data-action="period-end">My period ended today</button>
+        <div style="font-size:20px;font-weight:800;margin-bottom:4px;">Period · day ${dayOfPeriod}</div>
+        <div style="font-size:14px;color:var(--ink-soft);margin-bottom:14px;">Be kind to yourself — lighter sessions still count.</div>
+        <button class="btn" data-action="period-end">Period ended today</button>
       </div>`;
   } else {
     const overdue = c.daysUntil < 0;
@@ -1423,10 +1352,10 @@ function renderPeriod() {
         <div style="font-size:20px;font-weight:800;margin-bottom:4px;">Cycle day ${c.cycleDay}</div>
         <div style="font-size:15px;color:var(--ink-soft);margin-bottom:14px;">
           ${overdue
-            ? `Next period was expected ${niceDate(c.nextDate)} — ${Math.abs(c.daysUntil)} day${Math.abs(c.daysUntil) === 1 ? "" : "s"} ago`
-            : `Next period expected <b style="color:var(--pink-dark);">${niceDate(c.nextDate)}</b> — in ${c.daysUntil} day${c.daysUntil === 1 ? "" : "s"}`}
+            ? `Next expected ${niceDate(c.nextDate)} · ${Math.abs(c.daysUntil)}d ago`
+            : `Next <b style="color:var(--pink-dark);">${niceDate(c.nextDate)}</b> · in ${c.daysUntil}d`}
         </div>
-        <button class="btn" data-action="period-start">My period started today</button>
+        <button class="btn" data-action="period-start">Period started today</button>
       </div>`;
   }
 
@@ -1451,9 +1380,9 @@ function renderPeriod() {
     <div class="card">
       <div class="row between" style="margin-bottom:6px;">
         <h3 class="section-title" style="margin:0;">History</h3>
-        <button class="btn ghost small" data-action="period-undo" style="padding:4px 8px;min-height:0;">Undo last</button>
+        <button class="btn ghost small" data-action="period-undo" style="padding:2px 6px;min-height:0;font-size:14px;">Undo</button>
       </div>
-      ${c.entries.slice(-6).reverse().map(e => {
+      ${c.entries.slice(-5).reverse().map(e => {
         const len = e.end ? Math.floor((new Date(e.end) - new Date(e.start)) / 86400000) + 1 : null;
         return `<div class="row between" style="padding:8px 0;border-top:1px solid var(--border);font-size:14px;">
           <span>${niceDate(new Date(e.start))}</span>
@@ -1465,7 +1394,7 @@ function renderPeriod() {
   const statsHtml = c.entries.length ? `
     <div class="grid2" style="margin-bottom:16px;">
       <div class="stat-pill"><div class="label">Avg cycle</div><div class="value" style="font-size:19px;">${c.avg} days</div></div>
-      <div class="stat-pill"><div class="label">Periods logged</div><div class="value" style="font-size:19px;">${c.entries.length}</div></div>
+      <div class="stat-pill"><div class="label">Logged</div><div class="value" style="font-size:19px;">${c.entries.length}</div></div>
     </div>` : "";
 
   return `
@@ -1475,7 +1404,7 @@ function renderPeriod() {
     ${phaseHtml}
     ${statsHtml}
     ${historyHtml}
-    <div class="empty-hint" style="text-align:center;">🔒 Cycle data stays on your phone only — include it in your backups from Profile. Predictions are estimates, not medical advice.</div>
+    <div class="empty-hint" style="text-align:center;">🔒 Stays on your phone. Predictions are estimates, not medical advice.</div>
   `;
 }
 
