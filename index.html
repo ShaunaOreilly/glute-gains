@@ -391,19 +391,19 @@ const DEFAULT_PROGRAM = {
   },
 };
 
+const TOTAL_WEEKS = 10;
+
 const QUOTES = {
   1: "Strong glutes, strong life. Week 1 is about laying the foundation.",
   2: "Progress, not perfection. Just show up today.",
   3: "Every rep builds the body you're working for.",
   4: "Consistency beats intensity. Keep stacking days.",
-  5: "You are stronger than you were four weeks ago.",
-  6: "Halfway there. Trust the process.",
+  5: "Halfway there. Trust the process.",
+  6: "You are stronger than you were five weeks ago.",
   7: "Growth happens when you push past comfortable.",
-  8: "Small weekly wins add up to big transformations.",
-  9: "Your only competition is who you were last week.",
-  10: "Discipline is choosing what you want most.",
-  11: "Almost there. Finish this week strong.",
-  12: "12 weeks of work. A lifetime of strength. Well done.",
+  8: "Your only competition is who you were last week.",
+  9: "Almost there. Finish this week strong.",
+  10: "10 weeks of work. A lifetime of strength. Well done.",
 };
 
 /* ============================= STATE ============================= */
@@ -439,6 +439,28 @@ function load() {
     const parsed = JSON.parse(raw);
     const merged = Object.assign(defaultState(), parsed);
     if (!merged.name) merged.name = "Shauna";
+    // Keep the current week inside the program length
+    if (!merged.currentWeek || merged.currentWeek < 1) merged.currentWeek = 1;
+    if (merged.currentWeek > TOTAL_WEEKS) merged.currentWeek = TOTAL_WEEKS;
+
+    // Repair anything missing or malformed rather than crashing on a blank screen
+    if (!merged.program || typeof merged.program !== "object") {
+      merged.program = JSON.parse(JSON.stringify(DEFAULT_PROGRAM));
+    }
+    ALL_DAYS.forEach(d => {
+      const day = merged.program[d];
+      if (!day || !Array.isArray(day.exercises) || !day.exercises.length) {
+        merged.program[d] = JSON.parse(JSON.stringify(DEFAULT_PROGRAM[d]));
+      } else if (!Array.isArray(day.warmup)) {
+        day.warmup = [];
+      }
+    });
+    if (!merged.logs || typeof merged.logs !== "object") merged.logs = {};
+    if (!Array.isArray(merged.measurements)) merged.measurements = [];
+    if (!merged.nutrition || typeof merged.nutrition !== "object") merged.nutrition = {};
+    if (!merged.health || typeof merged.health !== "object") merged.health = {};
+    if (!merged.goals || typeof merged.goals !== "object") merged.goals = defaultState().goals;
+    if (!merged.period || !Array.isArray(merged.period.entries)) merged.period = { entries: [] };
     // One-time program updates (applied to her saved copy)
     if (!merged.migrations) merged.migrations = {};
     if (!merged.migrations.thuNoLungesLegExt && merged.program && merged.program.Thursday) {
@@ -573,7 +595,7 @@ function bestWeightForKey(k) {
 function exerciseHistory(exerciseName) {
   const points = [];
   const k = exerciseKey(exerciseName);
-  for (let week = 1; week <= 12; week++) {
+  for (let week = 1; week <= TOTAL_WEEKS; week++) {
     let maxW = null;
     PROGRAM_DAYS.forEach(day => {
       const key = dayKey(week, day);
@@ -1023,7 +1045,7 @@ function renderHome() {
           </div>`;
         }).join("")}
       </div>
-      <div style="font-size:12px;color:var(--ink-muted);margin-top:14px;">Week ${week} of 12${streak ? ` · 🔥 ${streak} day streak` : ""}</div>
+      <div style="font-size:12px;color:var(--ink-muted);margin-top:14px;">Week ${week} of ${TOTAL_WEEKS}${streak ? ` · 🔥 ${streak} day streak` : ""}</div>
     </div>
 
     ${goalsCard}
@@ -1042,7 +1064,7 @@ function renderWorkout() {
   }
 
   let weekChips = "";
-  for (let w = 1; w <= 12; w++) {
+  for (let w = 1; w <= TOTAL_WEEKS; w++) {
     weekChips += `<div class="week-chip ${w === week ? "active" : ""}" data-action="set-week" data-week="${w}">${w}</div>`;
   }
 
@@ -1142,11 +1164,11 @@ function renderWorkout() {
     <div class="row between" style="align-items:flex-start;margin-bottom:2px;">
       <div>
         <h1 class="page-title" style="margin-bottom:0;">Workouts</h1>
-        <p class="page-sub">Your 12-week program</p>
+        <p class="page-sub">Your ${TOTAL_WEEKS}-week program</p>
       </div>
       <button class="btn ${editMode ? "secondary" : "outline"} small" data-action="toggle-edit-mode">${editMode ? "✓ Done" : "✏️ Edit"}</button>
     </div>
-    ${editMode ? `<div class="empty-hint" style="margin:-6px 0 14px 0;">Edits apply to all 12 weeks.</div>` : ""}
+    ${editMode ? `<div class="empty-hint" style="margin:-6px 0 14px 0;">Edits apply to all ${TOTAL_WEEKS} weeks.</div>` : ""}
     <div class="week-strip">${weekChips}</div>
     ${dayCards}
   `;
@@ -1918,7 +1940,7 @@ function attachHandlers() {
       el.onclick = () => {
         const day = el.dataset.day, idx = Number(el.dataset.idx);
         if (state.program[day].exercises.length <= 1) { showToast("A day needs at least one exercise"); return; }
-        if (confirm("Delete this exercise? This applies to all 12 weeks.")) {
+        if (confirm("Delete this exercise? This applies to all " + TOTAL_WEEKS + " weeks.")) {
           state.program[day].exercises.splice(idx, 1);
           save(); render();
         }
@@ -1933,7 +1955,7 @@ function attachHandlers() {
     }
     if (action === "reset-program") {
       el.onclick = () => {
-        if (confirm("Reset the workout program back to the original 12-week plan? Your logged history, measurements and nutrition stay untouched.")) {
+        if (confirm("Reset the workout program back to the original " + TOTAL_WEEKS + "-week plan? Your logged history, measurements and nutrition stay untouched.")) {
           state.program = JSON.parse(JSON.stringify(DEFAULT_PROGRAM));
           save(); render();
           showToast("Program reset to default");
