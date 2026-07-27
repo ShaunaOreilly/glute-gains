@@ -693,6 +693,36 @@ function importHealthFromURL() {
   }
 }
 
+/* Reset straight from a link: ?reset=training clears logged workouts,
+   ?reset=all wipes everything. Works regardless of which screen you're on. */
+function applyResetFromURL() {
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    const mode = params.get("reset");
+    if (!mode) return null;
+
+    if (mode === "training") {
+      state.logs = {};
+      state.currentWeek = 1;
+      state.openDay = null;
+      save();
+    } else if (mode === "all") {
+      localStorage.removeItem(STORAGE_KEY);
+      state = defaultState();
+      state.onboarded = true;
+      save();
+    } else {
+      return null;
+    }
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    return mode;
+  } catch (e) {
+    return null;
+  }
+}
+
 function latestHealth() {
   if (!state.health) return null;
   const dates = Object.keys(state.health).sort();
@@ -1098,9 +1128,11 @@ function renderDayPage(week, day) {
     let setsHtml = "";
     loggedEx.sets.forEach((s, si) => {
       // Ghost-fill each set with what she lifted in the same set last week
+      // Ghost-fill only from real logged history. With nothing to show, stay blank
+      // rather than echoing the target, which reads like leftover data.
       const lastSet = lastEx && lastEx.sets[si];
       const wPlaceholder = (lastSet && lastSet.weight != null) ? lastSet.weight : "kg";
-      const rPlaceholder = (lastSet && lastSet.reps != null) ? lastSet.reps : escapeHtml(ex.reps);
+      const rPlaceholder = (lastSet && lastSet.reps != null) ? lastSet.reps : "reps";
       setsHtml += `
         <div class="set-row">
           <span class="setnum">${si + 1}</span>
@@ -2038,10 +2070,17 @@ document.querySelectorAll("#tabbar .tab-btn").forEach(btn => {
     setTab(btn.dataset.tab);
   });
 });
+/* Reset if we were opened from a reset link */
+const resetMode = applyResetFromURL();
+
 /* Pull any Apple Health values handed over by the Shortcuts automation */
 const importedCount = importHealthFromURL();
 
 setTab("home");
+
+if (resetMode) {
+  setTimeout(() => showToast(resetMode === "all" ? "Everything reset" : "Fresh start — Week 1 💪"), 2600);
+}
 
 if (importedCount) {
   setTimeout(() => showToast("⌚ Health data updated"), 2600);
