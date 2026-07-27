@@ -1506,6 +1506,8 @@ function renderProfile() {
 
     <div class="card">
       <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink-muted);margin-bottom:12px;">RESET</div>
+      <button class="btn" style="margin-bottom:10px;" data-action="restart-program">🔄 Start again from Week 1</button>
+      <p class="empty-hint" style="margin:-4px 0 14px 0;">Clears logged workouts only. Keeps your cycle, measurements and goals.</p>
       <button class="btn secondary" style="margin-bottom:10px;" data-action="reset-program">Program to default</button>
       <button class="btn outline" data-action="reset-data">Erase all data</button>
     </div>
@@ -1866,13 +1868,28 @@ function attachHandlers() {
         }
       };
     }
+    if (action === "restart-program") {
+      el.onclick = () => {
+        if (confirm("Start the program again from Week 1?\n\nThis clears every logged workout. Your cycle history, measurements, goals and name are kept.")) {
+          state.logs = {};
+          state.currentWeek = 1;
+          state.openDay = null;
+          expandedEx = null;
+          stopRestTimer();
+          save();
+          setTab("home");
+          showToast("Fresh start — Week 1 💪");
+        }
+      };
+    }
     if (action === "reset-data") {
       el.onclick = () => {
-        if (confirm("This will erase all your logged workouts, measurements and nutrition. Are you sure?")) {
+        if (confirm("This will erase EVERYTHING — workouts, cycle history, measurements, nutrition and goals. Are you sure?")) {
           localStorage.removeItem(STORAGE_KEY);
           state = defaultState();
           state.onboarded = true;
-          render();
+          save();
+          setTab("home");
           showToast("Data reset");
         }
       };
