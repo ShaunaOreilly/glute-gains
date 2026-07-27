@@ -321,19 +321,23 @@
 
 <script>
 /* ============================= PROGRAM DATA ============================= */
+/* The 4 scheduled sessions that count toward your weekly target */
 const PROGRAM_DAYS = ["Monday", "Tuesday", "Thursday", "Friday"];
+/* Optional extras you can do on any day — logged, but not part of the 4 */
+const EXTRA_DAYS = ["Cardio"];
+const ALL_DAYS = PROGRAM_DAYS.concat(EXTRA_DAYS);
 
 const DEFAULT_PROGRAM = {
   Monday: {
     title: "Heavy Glutes & Hamstrings",
     warmup: ["Incline Walk – 5 min", "Banded Walks – 2x15", "Glute Bridges – 2x15", "Frog Pumps – 2x20"],
     exercises: [
+      { name: "45° Back Extensions", sets: 3, reps: "12", track: true },
       { name: "Barbell Hip Thrust", sets: 4, reps: "8", track: true },
-      { name: "Romanian Deadlift", sets: 4, reps: "8-10", track: true },
+      { name: "Dumbbell Romanian Deadlift", sets: 4, reps: "8-10", track: true },
       { name: "Bulgarian Split Squat", sets: 3, reps: "10 each leg", track: true },
       { name: "Seated Hamstring Curl", sets: 3, reps: "12", track: true },
       { name: "Cable Kickbacks", sets: 3, reps: "15", track: true },
-      { name: "45° Back Extensions", sets: 3, reps: "12", track: true },
     ],
   },
   Tuesday: {
@@ -341,8 +345,8 @@ const DEFAULT_PROGRAM = {
     warmup: [],
     exercises: [
       { name: "Lat Pulldown", sets: 3, reps: "10", track: true },
-      { name: "Seated Row", sets: 3, reps: "10", track: true },
-      { name: "Shoulder Press", sets: 3, reps: "10", track: true },
+      { name: "Single Arm Seated Row", sets: 3, reps: "10 each arm", track: true },
+      { name: "Machine Shoulder Press", sets: 3, reps: "10", track: true },
       { name: "Chest Press", sets: 3, reps: "10", track: true },
       { name: "Lateral Raises", sets: 3, reps: "12", track: true },
       { name: "Biceps Curl", sets: 3, reps: "12", track: true },
@@ -368,11 +372,21 @@ const DEFAULT_PROGRAM = {
       // Glutes first while you're fresh
       { name: "Hip Thrust", sets: 4, reps: "15", track: true },
       { name: "Reverse Lunge (Smith Machine)", sets: 3, reps: "12 each leg", track: true },
-      { name: "Cable Kickbacks", sets: 3, reps: "15 each leg", track: true },
+      { name: "Machine Glute Kickbacks", sets: 3, reps: "15 each leg", track: true },
       // Upper accessories to finish
       { name: "Assisted Pull Ups", sets: 3, reps: "10", track: true },
       { name: "Incline Dumbbell Press", sets: 3, reps: "10", track: true },
       { name: "Face Pull", sets: 3, reps: "15", track: true },
+    ],
+  },
+  Cardio: {
+    title: "Cardio & Abs",
+    warmup: [],
+    exercises: [
+      { name: "Treadmill 5k", sets: 1, reps: "5 km", track: false },
+      { name: "Hanging Knee Raises", sets: 3, reps: "15", track: false },
+      { name: "Cable Crunch", sets: 3, reps: "15", track: true },
+      { name: "Plank", sets: 3, reps: "45 sec", track: false },
     ],
   },
 };
@@ -445,6 +459,30 @@ function load() {
         sat.exercises.splice(2, 0, { name: "Reverse Lunge (Smith Machine)", sets: 3, reps: "12 each leg", track: true });
       }
       merged.migrations.satAbductionSwap = true;
+    }
+    if (!merged.migrations.exerciseTweaksJul && merged.program) {
+      const rename = (day, from, to) => {
+        const d = merged.program[day];
+        if (!d) return;
+        d.exercises.forEach(e => { if (from.test(e.name || "")) e.name = to; });
+      };
+      // Monday: dumbbell RDL, and back extensions lead the session
+      rename("Monday", /^romanian deadlift$/i, "Dumbbell Romanian Deadlift");
+      if (merged.program.Monday) {
+        const ex = merged.program.Monday.exercises;
+        const bi = ex.findIndex(e => /back extension/i.test(e.name || ""));
+        if (bi > 0) ex.unshift(ex.splice(bi, 1)[0]);
+      }
+      // Tuesday: single arm row + machine shoulder press
+      rename("Tuesday", /^seated row$/i, "Single Arm Seated Row");
+      rename("Tuesday", /^shoulder press$/i, "Machine Shoulder Press");
+      // Friday: machine glute kickbacks
+      rename("Friday", /^cable kickbacks/i, "Machine Glute Kickbacks");
+      // Optional cardio + abs day
+      if (!merged.program.Cardio) {
+        merged.program.Cardio = JSON.parse(JSON.stringify(DEFAULT_PROGRAM.Cardio));
+      }
+      merged.migrations.exerciseTweaksJul = true;
     }
     if (!merged.migrations.fourDayPlan && merged.program) {
       // Drop to 4 days: fold the best of Friday (upper) and Saturday (glute pump) into one
@@ -854,11 +892,11 @@ let slideDir = "";       // "left" | "right" — direction of the last day chang
    Swiping right off the first day leaves the session and returns to the list. */
 function goToDay(offset) {
   if (!state.openDay) return;
-  const i = PROGRAM_DAYS.indexOf(state.openDay);
+  const i = ALL_DAYS.indexOf(state.openDay);
   if (i === -1) return;
   const next = i + offset;
 
-  if (next < 0 || next >= PROGRAM_DAYS.length) {
+  if (next < 0 || next >= ALL_DAYS.length) {
     // Off either end: back out to the list of days
     state.openDay = null;
     expandedEx = null;
@@ -867,7 +905,7 @@ function goToDay(offset) {
     scrollTop();
     return;
   }
-  state.openDay = PROGRAM_DAYS[next];
+  state.openDay = ALL_DAYS[next];
   expandedEx = null;
   slideDir = offset > 0 ? "right" : "left";
   save(); render();
@@ -999,7 +1037,7 @@ function renderWorkout() {
   const week = state.currentWeek;
 
   // A day is open: show it as its own page
-  if (!editMode && state.openDay && PROGRAM_DAYS.includes(state.openDay)) {
+  if (!editMode && state.openDay && ALL_DAYS.includes(state.openDay)) {
     return renderDayPage(week, state.openDay);
   }
 
@@ -1009,8 +1047,10 @@ function renderWorkout() {
   }
 
   let dayCards = "";
-  PROGRAM_DAYS.forEach(day => {
+  ALL_DAYS.forEach(day => {
     const template = state.program[day];
+    if (!template) return;
+    const isExtra = EXTRA_DAYS.includes(day);
     const log = getDayLog(week, day);
     const done = isDayFullyLogged(week, day);
     const isOpen = editMode || state.openDay === day;
@@ -1085,9 +1125,9 @@ function renderWorkout() {
       <div class="card day-card">
         <div class="day-header" data-action="${editMode ? "" : "open-day"}" data-day="${day}">
           <div class="row">
-            <div class="day-icon ${done ? "done" : ""}">${editMode ? "✏️" : (done ? "✅" : "💪")}</div>
+            <div class="day-icon ${done ? "done" : ""}">${editMode ? "✏️" : (done ? "✅" : (isExtra ? "🏃‍♀️" : "💪"))}</div>
             <div>
-              <div style="font-size:12px;color:var(--ink-muted);font-weight:700;letter-spacing:.3px;">${day.toUpperCase()}</div>
+              <div style="font-size:12px;color:var(--ink-muted);font-weight:700;letter-spacing:.3px;">${isExtra ? "ANY DAY · OPTIONAL" : day.toUpperCase()}</div>
               <div style="font-size:17px;font-weight:800;">${template.title}</div>
               <div style="font-size:13px;color:var(--ink-muted);">${editMode ? "Editing" : doneCount + "/" + template.exercises.length}</div>
             </div>
@@ -1207,9 +1247,9 @@ function renderDayPage(week, day) {
     : "";
 
   const pct = Math.round((template.exercises.length ? doneCount / template.exercises.length : 0) * 100);
-  const di = PROGRAM_DAYS.indexOf(day);
-  const prevDay = di > 0 ? PROGRAM_DAYS[di - 1] : null;
-  const nextDay = di < PROGRAM_DAYS.length - 1 ? PROGRAM_DAYS[di + 1] : null;
+  const di = ALL_DAYS.indexOf(day);
+  const prevDay = di > 0 ? ALL_DAYS[di - 1] : null;
+  const nextDay = di < ALL_DAYS.length - 1 ? ALL_DAYS[di + 1] : null;
   const anim = slideDir === "right" ? "slide-from-right" : slideDir === "left" ? "slide-from-left" : "slide-in";
   return `
     <div class="${anim}" id="day-page" style="touch-action:pan-y;">
@@ -1285,7 +1325,7 @@ function renderProgress() {
 
   const allTracked = [];
   const seenEx = new Set();
-  PROGRAM_DAYS.forEach(d => state.program[d].exercises.forEach(ex => {
+  ALL_DAYS.forEach(d => state.program[d] && state.program[d].exercises.forEach(ex => {
     if (ex.track && !seenEx.has(exerciseKey(ex.name))) { seenEx.add(exerciseKey(ex.name)); allTracked.push(ex.name); }
   }));
   if (!allTracked.includes(chartExercise)) chartExercise = allTracked[0] || "Barbell Hip Thrust";
